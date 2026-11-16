@@ -37,8 +37,8 @@ if(BUILD_TESTING)
 
     add_executable(${PROJECT_NAME}-tests
         tests/main.cpp
-        tests/picopb.cpp
         tests/libprotobuf.cpp
+        tests/writer.cpp
         ${descriptor_set}
     )
     target_link_libraries(${PROJECT_NAME}-tests PRIVATE

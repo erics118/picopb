@@ -14,4 +14,7 @@ Checks: >
   -readability-identifier-length,
   -modernize-use-trailing-return-type,
   -cppcoreguidelines-avoid-c-arrays,
-  -*-magic-numbers
+  -*-magic-numbers,
+  -modernize-use-designated-initializers
+CheckOptions:
+  readability-function-cognitive-complexity.IgnoreMacros: true

@@ -41,7 +41,7 @@ inline std::unique_ptr<gpb::DescriptorPool> load_pool() {
     return out;
 }
 
-// libprotobuf's table of every message type
+// libprotobuf's descriptor pool, built once from every file in the test descriptor set
 inline gpb::DescriptorPool& pool() {
     static std::unique_ptr<gpb::DescriptorPool> p = load_pool();
     return *p;
@@ -62,7 +62,7 @@ inline std::unique_ptr<gpb::Message> from_text(std::string_view full_name, std::
     return message;
 }
 
-// extract the bytes that libprotobuf encode for a message
+// the bytes libprotobuf encodes for the message from_text(full_name, text) builds
 inline std::vector<std::byte> libprotobuf_encode(std::string_view full_name,
                                                  std::string_view text) {
     std::string bytes = from_text(full_name, text)->SerializeAsString();
@@ -72,7 +72,7 @@ inline std::vector<std::byte> libprotobuf_encode(std::string_view full_name,
     return {view.begin(), view.end()};
 }
 
-// write bytes as hex, bc doctest doesn't support pretty printing vector of bytes
+// the bytes as hex text, since doctest can't print a vector of bytes
 inline std::string hex(std::span<const std::byte> bytes) {
     std::string out;
 

@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package picopb.test.ints;
+
+enum Color {
+  COLOR_UNSPECIFIED = 0;
+  RED = 1;
+  // negative value uses 10 bytes
+  NEGATIVE = -1;
+}
+
+message Ints {
+  int32 i32 = 1;
+  int64 i64 = 2;
+  uint32 u32 = 3;
+  uint64 u64 = 4;
+  sint32 s32 = 5;
+  sint64 s64 = 6;
+  fixed32 fx32 = 7;
+  fixed64 fx64 = 8;
+  sfixed32 sfx32 = 9;
+  sfixed64 sfx64 = 10;
+  bool b = 11;
+  Color color = 12;
+}
