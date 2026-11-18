@@ -2,6 +2,7 @@
 
 #include <doctest/doctest.h>
 
+#include <array>
 #include <cstddef>
 #include <picopb/picopb.hpp>
 #include <span>
@@ -61,6 +62,27 @@ std::string picopb_hex(const Ints& message) {
     return test_util::hex(std::span(buffer).first(*size));
 }
 
+// libprotobuf accepts the bytes only if valid, picopb agrees, and both decode the same message
+void check_decode(std::string_view hex_bytes, bool valid) {
+    INFO(hex_bytes);
+
+    std::vector<std::byte> bytes = test_util::from_hex(hex_bytes);
+    auto reference = test_util::libprotobuf_reencode<Ints>(bytes);
+    auto decoded = ppb::decode<Ints>(bytes);
+
+    REQUIRE(reference.has_value() == valid);
+    REQUIRE(decoded.has_value() == valid);
+
+    if (decoded) {
+        CHECK(picopb_hex(*decoded) == test_util::hex(*reference));
+    }
+}
+
+// decode runs at compile time: the encoding docs' example, an int32 field 1 set to 150
+constexpr std::array one_fifty{std::byte{0x08}, std::byte{0x96}, std::byte{0x01}};
+
+static_assert(ppb::decode<Ints>(one_fifty)->i32 == 150);
+
 }  // namespace
 
 TEST_CASE("Ints encodes to libprotobuf's bytes") {
@@ -102,4 +124,78 @@ TEST_CASE("ppb::encode gives BufferTooSmall for every buffer shorter than the en
 
     REQUIRE(result.has_value());
     CHECK(*result == size);
+}
+
+TEST_CASE("Ints decodes libprotobuf's bytes back to the same message") {
+    CHECK(ppb::decode<Ints>({}) == Ints{});
+    CHECK(ppb::decode<Ints>(test_util::libprotobuf_encode<Ints>(max_text)) == max_ints);
+    CHECK(ppb::decode<Ints>(test_util::libprotobuf_encode<Ints>(min_text)) == min_ints);
+}
+
+TEST_CASE("ppb::decode accepts and rejects exactly the bytes libprotobuf does") {
+    SUBCASE("valid input") {
+        // field 1 twice, so the last value wins
+        check_decode("08 01 08 02", true);
+
+        // fields 13 to 16 aren't in Ints, one per wire type, so they're skipped
+        check_decode("68 05", true);
+        check_decode("72 02 aa bb", true);
+        check_decode("7d 01 02 03 04", true);
+        check_decode("81 01 01 02 03 04 05 06 07 08", true);
+
+        // field 1 is an int32 but arrives with the i32 wire type
+        check_decode("0d 01 02 03 04", true);
+
+        // a bool of 2, and an enum value Color has no name for
+        check_decode("58 02", true);
+        check_decode("60 05", true);
+
+        // an int32 of -1 as 10 bytes, and an int32 whose varint is wider than 32 bits
+        check_decode("08 ff ff ff ff ff ff ff ff ff 01", true);
+        check_decode("08 80 80 80 80 10", true);
+
+        // a 10-byte varint whose last byte has bits beyond the 64th
+        check_decode("08 ff ff ff ff ff ff ff ff ff 7f", true);
+
+        // the largest field number, 2^29 - 1, as an unknown field
+        check_decode("f8 ff ff ff 0f 01", true);
+    }
+
+    SUBCASE("malformed input") {
+        // a tag with no value, and a varint cut off in the middle
+        check_decode("08", false);
+        check_decode("08 80", false);
+
+        // a varint of 11 bytes
+        check_decode("08 ff ff ff ff ff ff ff ff ff ff 01", false);
+
+        // fixed32, fixed64 and length-delimited values cut short
+        check_decode("3d 01 02", false);
+        check_decode("41 01 02 03", false);
+        check_decode("72 05 aa", false);
+
+        // field number 0
+        check_decode("00 01", false);
+
+        // wire types 3, 4, 6 and 7, on field 13
+        check_decode("6b", false);
+        check_decode("6c", false);
+        check_decode("6e", false);
+        check_decode("6f", false);
+
+        // a tag wider than 32 bits
+        check_decode("80 80 80 80 80 01 01", false);
+    }
+}
+
+TEST_CASE("ppb::decode reports why the input is malformed") {
+    auto error = [](std::string_view hex_bytes) {
+        return ppb::decode<Ints>(test_util::from_hex(hex_bytes)).error();
+    };
+
+    CHECK(error("08 80") == ppb::Error::Truncated);
+    CHECK(error("72 05 aa") == ppb::Error::Truncated);
+    CHECK(error("08 ff ff ff ff ff ff ff ff ff ff 01") == ppb::Error::InvalidVarint);
+    CHECK(error("00 01") == ppb::Error::InvalidTag);
+    CHECK(error("6e") == ppb::Error::InvalidTag);
 }

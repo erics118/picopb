@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <picopb/picopb.hpp>
 #include <string_view>
 
@@ -44,6 +45,40 @@ struct Ints {
         w.write_bool(11, b);
         w.write_enum(12, color);
     }
+
+    // reads one field, for ppb::decode, and returns false for a field it doesn't know
+    constexpr std::expected<bool, ppb::Error> read_field(ppb::Reader& r, ppb::Tag tag) {
+        switch (tag.field_number) {
+            case 1:
+                return r.read_int32(tag.wire, i32);
+            case 2:
+                return r.read_int64(tag.wire, i64);
+            case 3:
+                return r.read_uint32(tag.wire, u32);
+            case 4:
+                return r.read_uint64(tag.wire, u64);
+            case 5:
+                return r.read_sint32(tag.wire, s32);
+            case 6:
+                return r.read_sint64(tag.wire, s64);
+            case 7:
+                return r.read_fixed32(tag.wire, fx32);
+            case 8:
+                return r.read_fixed64(tag.wire, fx64);
+            case 9:
+                return r.read_sfixed32(tag.wire, sfx32);
+            case 10:
+                return r.read_sfixed64(tag.wire, sfx64);
+            case 11:
+                return r.read_bool(tag.wire, b);
+            case 12:
+                return r.read_enum(tag.wire, color);
+            default:
+                return false;
+        }
+    }
+
+    bool operator==(const Ints&) const = default;
 };
 
 }  // namespace picopb::test_messages::ints

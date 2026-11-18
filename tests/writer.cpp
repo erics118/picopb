@@ -46,6 +46,17 @@ void check(std::string_view text, std::invocable<ppb::Writer&> auto write) {
 
     CHECK_FALSE(w.overflowed());
     CHECK(test_util::hex(std::span(buffer).first(w.size())) == test_util::hex(expected));
+
+    // decoding libprotobuf's bytes and encoding the result again gives the same bytes
+    auto decoded = ppb::decode<Ints>(expected);
+
+    REQUIRE(decoded.has_value());
+
+    std::vector<std::byte> again(expected.size());
+    auto size = ppb::encode(*decoded, again);
+
+    REQUIRE(size.has_value());
+    CHECK(test_util::hex(std::span(again).first(*size)) == test_util::hex(expected));
 }
 
 // runs check for each value, with the text built from the field's name
@@ -63,7 +74,7 @@ void check_field(std::string_view name, void (ppb::Writer::*write_value)(std::ui
 
 }  // namespace
 
-TEST_CASE("each field writer gives libprotobuf's bytes, and overflows every shorter buffer") {
+TEST_CASE("each field type matches libprotobuf, overflows shorter buffers, and decodes back") {
     check_field("i32", &ppb::Writer::write_int32, 1,
                 {0, 1, -1, 127, 128, test_util::int32_min, test_util::int32_max});
     check_field("i64", &ppb::Writer::write_int64, 2,
