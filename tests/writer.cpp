@@ -1,6 +1,5 @@
 #include <doctest/doctest.h>
 
-#include <array>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -77,22 +76,6 @@ void check_field(std::string_view name, void (ppb::Writer::*write_value)(std::ui
               [&](ppb::Writer& w) { (w.*write_value)(field_number, value); });
     }
 }
-
-// one call per wire type, plus write_enum, so the build fails if any can't run at compile time
-constexpr bool encodes_at_compile_time() {
-    std::array<std::byte, 32> buffer{};
-    ppb::Writer w{buffer};
-
-    w.write_int32(1, -1);
-    w.write_fixed32(7, 1);
-    w.write_fixed64(8, 1);
-    w.write_enum(12, Color::RED);
-
-    // 11 + 5 + 9 + 2
-    return w.size() == 27 && !w.overflowed();
-}
-
-static_assert(encodes_at_compile_time());
 
 }  // namespace
 

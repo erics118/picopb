@@ -2,23 +2,42 @@ cmake_minimum_required(VERSION 3.28)
 
 project(picopb VERSION 0.1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(${PROJECT_NAME}-warnings INTERFACE)
-target_compile_options(${PROJECT_NAME}-warnings INTERFACE
+add_library(picopb INTERFACE)
+add_library(picopb::picopb ALIAS picopb)
+target_include_directories(picopb INTERFACE include)
+target_compile_features(picopb INTERFACE cxx_std_23)
+
+# if is a subproject we dont do anything else
+if(NOT PROJECT_IS_TOP_LEVEL)
+    return()
+endif()
+
+option(PICOPB_SANITIZE "build everything with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+if(PICOPB_SANITIZE)
+    # without -fno-sanitize-recover, ubsan prints a report and the test still passes
+    add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+endif()
+
+add_library(picopb-warnings INTERFACE)
+target_compile_options(picopb-warnings INTERFACE
     -Wall
     -Wextra
     -Wpedantic
+    -Wconversion
+    -Werror
 )
 
-add_library(${PROJECT_NAME} INTERFACE)
-add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
-target_include_directories(${PROJECT_NAME} INTERFACE include)
-target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_23)
+# also build the examples for the rp2040
+add_executable(picopb-example examples/encode.cpp)
+target_link_libraries(picopb-example PRIVATE
+    picopb::picopb
+    picopb-warnings
+)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -35,21 +54,24 @@ if(BUILD_TESTING)
         DEPENDS ${test_protos}
     )
 
-    add_executable(${PROJECT_NAME}-tests
+    add_executable(picopb-tests
         tests/main.cpp
         tests/libprotobuf.cpp
         tests/writer.cpp
         ${descriptor_set}
     )
-    target_link_libraries(${PROJECT_NAME}-tests PRIVATE
-        ${PROJECT_NAME}::${PROJECT_NAME}
-        ${PROJECT_NAME}-warnings
+    target_link_libraries(picopb-tests PRIVATE
+        picopb::picopb
+        picopb-warnings
         doctest::doctest
         protobuf::libprotobuf
     )
-    target_compile_definitions(${PROJECT_NAME}-tests PRIVATE
+    target_compile_definitions(picopb-tests PRIVATE
         PICOPB_TEST_DESCRIPTOR_SET="${descriptor_set}"
     )
+
+    add_test(NAME example COMMAND picopb-example)
+
     include(doctest)
-    doctest_discover_tests(${PROJECT_NAME}-tests)
+    doctest_discover_tests(picopb-tests)
 endif()
