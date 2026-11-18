@@ -56,6 +56,7 @@ if(BUILD_TESTING)
 
     add_executable(picopb-tests
         tests/main.cpp
+        tests/ints.cpp
         tests/libprotobuf.cpp
         tests/writer.cpp
         ${descriptor_set}

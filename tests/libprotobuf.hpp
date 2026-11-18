@@ -17,7 +17,7 @@
 #include <vector>
 
 // we use libprotobuf as the reference for our tests
-namespace test {
+namespace test_util {
 
 namespace gpb = google::protobuf;
 
@@ -62,10 +62,10 @@ inline std::unique_ptr<gpb::Message> from_text(std::string_view full_name, std::
     return message;
 }
 
-// the bytes libprotobuf encodes for the message from_text(full_name, text) builds
-inline std::vector<std::byte> libprotobuf_encode(std::string_view full_name,
-                                                 std::string_view text) {
-    std::string bytes = from_text(full_name, text)->SerializeAsString();
+// the bytes libprotobuf encodes for picopb message type M, holding the values in text
+template <class M>
+std::vector<std::byte> libprotobuf_encode(std::string_view text) {
+    std::string bytes = from_text(M::full_name, text)->SerializeAsString();
 
     auto view = std::as_bytes(std::span(bytes));
 
@@ -83,4 +83,4 @@ inline std::string hex(std::span<const std::byte> bytes) {
     return out;
 }
 
-}  // namespace test
+}  // namespace test_util

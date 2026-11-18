@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package picopb.test.ints;
+package picopb.test_messages.ints;
 
 enum Color {
   COLOR_UNSPECIFIED = 0;

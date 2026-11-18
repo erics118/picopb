@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <span>
 #include <type_traits>
 #include <utility>
@@ -39,6 +40,12 @@ constexpr std::uint32_t zigzag32(std::int32_t value) {
 constexpr std::uint64_t zigzag64(std::int64_t value) {
     return (static_cast<std::uint64_t>(value) << 1) ^ static_cast<std::uint64_t>(value >> 63);
 }
+
+// why an encode failed
+enum class Error : std::uint8_t {
+    // the message's encoding needs more bytes than the buffer has
+    BufferTooSmall,
+};
 
 // writes wire format bytes into a caller's buffer
 // a byte that doesn't fit is dropped and sets overflowed(), and the output is then incomplete
@@ -172,5 +179,23 @@ class Writer {
         write_int32(field_number, std::to_underlying(value));
     }
 };
+
+// a generated message, which writes its fields into a Writer
+template <class M>
+concept Message = requires(const M& message, Writer& w) { message.write(w); };
+
+// encodes message into buffer and returns the number of bytes written
+template <Message M>
+constexpr std::expected<std::size_t, Error> encode(const M& message, std::span<std::byte> buffer) {
+    Writer w{buffer};
+
+    message.write(w);
+
+    if (w.overflowed()) {
+        return std::unexpected(Error::BufferTooSmall);
+    }
+
+    return w.size();
+}
 
 }  // namespace ppb
