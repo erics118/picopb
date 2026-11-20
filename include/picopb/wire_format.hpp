@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 namespace ppb {
@@ -25,6 +26,34 @@ enum class WireType : std::uint8_t {
     // used for: fixed32, sfixed32, float
     I32 = 5,
 };
+
+// if the wire type is supported
+constexpr bool is_supported(WireType wire) {
+    switch (wire) {
+        case WireType::Varint:
+        case WireType::I64:
+        case WireType::Len:
+        case WireType::I32:
+            return true;
+    }
+
+    return false;
+}
+
+// how many bytes a value of this wire type takes, or 0 if its size isn't fixed
+constexpr std::size_t fixed_size(WireType wire) {
+    switch (wire) {
+        case WireType::I32:
+            return 4;
+        case WireType::I64:
+            return 8;
+        case WireType::Varint:
+        case WireType::Len:
+            return 0;
+    }
+
+    return 0;
+}
 
 // the field number and wire type at the start of every field
 struct Tag {

@@ -16,7 +16,7 @@ using cpp_type_t = S::cpp_type;
 // has a function defining how to convert to and from its wire format
 template <class S>
 concept Primitive = requires(cpp_type_t<S> value, std::uint64_t bits) {
-    requires S::wire != WireType::Len;
+    requires S::wire == WireType::Varint || fixed_size(S::wire) != 0;
     { S::to_bits(value) } -> std::same_as<std::uint64_t>;
     { S::from_bits(bits) } -> std::same_as<cpp_type_t<S>>;
 };

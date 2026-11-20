@@ -71,10 +71,8 @@ class Writer {
 
         if constexpr (S::wire == WireType::Varint) {
             write_varint(bits);
-        } else if constexpr (S::wire == WireType::I32) {
-            write_little_endian(bits, 4);
         } else {
-            write_little_endian(bits, 8);
+            write_little_endian(bits, fixed_size(S::wire));
         }
     }
 };

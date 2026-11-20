@@ -78,10 +78,9 @@ class Reader {
 
         auto wire = static_cast<WireType>(*bits & 7);
         std::uint64_t field_number = *bits >> 3;
-        bool known_wire = wire == WireType::Varint || wire == WireType::I64 ||
-                          wire == WireType::Len || wire == WireType::I32;
 
-        if (*bits > std::numeric_limits<std::uint32_t>::max() || field_number == 0 || !known_wire) {
+        if (*bits > std::numeric_limits<std::uint32_t>::max() || field_number == 0 ||
+            !is_supported(wire)) {
             return std::unexpected(Error::InvalidTag);
         }
 
@@ -103,8 +102,6 @@ class Reader {
 
                 return {};
             }
-            case WireType::I64:
-                return advance(8);
             case WireType::Len: {
                 auto length = read_varint();
 
@@ -115,7 +112,8 @@ class Reader {
                 return advance(*length);
             }
             case WireType::I32:
-                return advance(4);
+            case WireType::I64:
+                return advance(fixed_size(wire));
         }
 
         return std::unexpected(Error::InvalidTag);
@@ -133,10 +131,8 @@ class Reader {
 
         if constexpr (S::wire == WireType::Varint) {
             bits = read_varint();
-        } else if constexpr (S::wire == WireType::I32) {
-            bits = read_little_endian(4);
         } else {
-            bits = read_little_endian(8);
+            bits = read_little_endian(fixed_size(S::wire));
         }
 
         if (!bits) {
