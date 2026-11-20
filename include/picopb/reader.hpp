@@ -1,56 +1,19 @@
 #pragma once
 
-#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <limits>
 #include <picopb/error.hpp>
+#include <picopb/primitives.hpp>
 #include <picopb/wire_format.hpp>
 #include <span>
-#include <type_traits>
 
 namespace ppb {
 
 // reads bytes
 class Reader {
    private:
-    // reads a varint, i32 or i64 value, enums included, and stores from_bits(bits) in value
-    // false means the field has another wire type, so the caller skips it like an unknown field
-    template <WireType expected_wire, class T, class FromBits>
-        requires(expected_wire != WireType::Len)
-    constexpr std::expected<bool, Error> read_field(WireType wire, T& value, FromBits from_bits)
-        requires requires(std::uint64_t bits) {
-            { from_bits(bits) } -> std::same_as<T>;
-        }
-    {
-        if (wire != expected_wire) {
-            return false;
-        }
-
-        std::expected<std::uint64_t, Error> bits = 0;
-
-        switch (expected_wire) {
-            case WireType::Varint:
-                bits = read_varint();
-                break;
-            case WireType::I32:
-                bits = read_little_endian(4);
-                break;
-            case WireType::I64:
-                bits = read_little_endian(8);
-                break;
-        }
-
-        if (!bits) {
-            return std::unexpected(bits.error());
-        }
-
-        value = from_bits(*bits);
-
-        return true;
-    }
-
     constexpr std::expected<std::uint64_t, Error> read_little_endian(std::size_t bytes) {
         if (bytes > in_.size() - pos_) {
             return std::unexpected(Error::Truncated);
@@ -75,15 +38,6 @@ class Reader {
         return {};
     }
 
-    std::span<const std::byte> in_;
-    std::size_t pos_ = 0;
-
-   public:
-    constexpr explicit Reader(std::span<const std::byte> in) : in_(in) {}
-
-    // whether every byte has been read
-    [[nodiscard]] constexpr bool done() const { return pos_ == in_.size(); }
-
     constexpr std::expected<std::uint64_t, Error> read_varint() {
         std::uint64_t value = 0;
 
@@ -105,6 +59,15 @@ class Reader {
 
         return std::unexpected(Error::InvalidVarint);
     }
+
+    std::span<const std::byte> in_;
+    std::size_t pos_ = 0;
+
+   public:
+    constexpr explicit Reader(std::span<const std::byte> in) : in_(in) {}
+
+    // whether every byte has been read
+    [[nodiscard]] constexpr bool done() const { return pos_ == in_.size(); }
 
     constexpr std::expected<Tag, Error> read_tag() {
         auto bits = read_varint();
@@ -158,74 +121,31 @@ class Reader {
         return std::unexpected(Error::InvalidTag);
     }
 
-    // an int32 is sign-extended to 64 bits when written, so its value is the low 32 bits
-    constexpr std::expected<bool, Error> read_int32(WireType wire, std::int32_t& value) {
-        return read_field<WireType::Varint>(
-            wire, value, [](std::uint64_t bits) { return static_cast<std::int32_t>(bits); });
-    }
+    // reads a varint, i32 or i64 value, enums included, and stores S::from_bits(bits) in value
+    // false means the field has another wire type, so the caller skips it like an unknown field
+    template <Primitive S>
+    constexpr std::expected<bool, Error> read(WireType wire, cpp_type_t<S>& value) {
+        if (wire != S::wire) {
+            return false;
+        }
 
-    constexpr std::expected<bool, Error> read_int64(WireType wire, std::int64_t& value) {
-        return read_field<WireType::Varint>(
-            wire, value, [](std::uint64_t bits) { return static_cast<std::int64_t>(bits); });
-    }
+        std::expected<std::uint64_t, Error> bits = 0;
 
-    constexpr std::expected<bool, Error> read_uint32(WireType wire, std::uint32_t& value) {
-        return read_field<WireType::Varint>(
-            wire, value, [](std::uint64_t bits) { return static_cast<std::uint32_t>(bits); });
-    }
+        if constexpr (S::wire == WireType::Varint) {
+            bits = read_varint();
+        } else if constexpr (S::wire == WireType::I32) {
+            bits = read_little_endian(4);
+        } else {
+            bits = read_little_endian(8);
+        }
 
-    constexpr std::expected<bool, Error> read_uint64(WireType wire, std::uint64_t& value) {
-        return read_field<WireType::Varint>(wire, value, [](std::uint64_t bits) { return bits; });
-    }
+        if (!bits) {
+            return std::unexpected(bits.error());
+        }
 
-    // undo zigzag32
-    constexpr std::expected<bool, Error> read_sint32(WireType wire, std::int32_t& value) {
-        return read_field<WireType::Varint>(wire, value, [](std::uint64_t bits) {
-            auto n = static_cast<std::uint32_t>(bits);
+        value = S::from_bits(*bits);
 
-            return static_cast<std::int32_t>((n >> 1) ^ (0U - (n & 1U)));
-        });
-    }
-
-    // undo zigzag64
-    constexpr std::expected<bool, Error> read_sint64(WireType wire, std::int64_t& value) {
-        return read_field<WireType::Varint>(wire, value, [](std::uint64_t bits) {
-            return static_cast<std::int64_t>((bits >> 1) ^ (0U - (bits & 1U)));
-        });
-    }
-
-    constexpr std::expected<bool, Error> read_fixed32(WireType wire, std::uint32_t& value) {
-        return read_field<WireType::I32>(
-            wire, value, [](std::uint64_t bits) { return static_cast<std::uint32_t>(bits); });
-    }
-
-    constexpr std::expected<bool, Error> read_fixed64(WireType wire, std::uint64_t& value) {
-        return read_field<WireType::I64>(wire, value, [](std::uint64_t bits) { return bits; });
-    }
-
-    constexpr std::expected<bool, Error> read_sfixed32(WireType wire, std::int32_t& value) {
-        return read_field<WireType::I32>(
-            wire, value, [](std::uint64_t bits) { return static_cast<std::int32_t>(bits); });
-    }
-
-    constexpr std::expected<bool, Error> read_sfixed64(WireType wire, std::int64_t& value) {
-        return read_field<WireType::I64>(
-            wire, value, [](std::uint64_t bits) { return static_cast<std::int64_t>(bits); });
-    }
-
-    // any value other than 0 is true
-    constexpr std::expected<bool, Error> read_bool(WireType wire, bool& value) {
-        return read_field<WireType::Varint>(wire, value,
-                                            [](std::uint64_t bits) { return bits != 0; });
-    }
-
-    // an enum is read like an int32, and keeps values it has no name for
-    template <class E>
-        requires std::is_enum_v<E> && std::is_same_v<std::underlying_type_t<E>, std::int32_t>
-    constexpr std::expected<bool, Error> read_enum(WireType wire, E& value) {
-        return read_field<WireType::Varint>(wire, value, [](std::uint64_t bits) {
-            return static_cast<E>(static_cast<std::int32_t>(bits));
-        });
+        return true;
     }
 };
 

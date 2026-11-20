@@ -32,14 +32,4 @@ struct Tag {
     WireType wire;
 };
 
-// zigzag encoding for sint32 and sint64
-// n >= 0 gets turned into 2n; n < 0 becomes -2n-1
-constexpr std::uint32_t zigzag32(std::int32_t value) {
-    return (static_cast<std::uint32_t>(value) << 1) ^ static_cast<std::uint32_t>(value >> 31);
-}
-
-constexpr std::uint64_t zigzag64(std::int64_t value) {
-    return (static_cast<std::uint64_t>(value) << 1) ^ static_cast<std::uint64_t>(value >> 63);
-}
-
 }  // namespace ppb

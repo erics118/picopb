@@ -29,6 +29,8 @@ target_compile_options(picopb-warnings INTERFACE
     -Wextra
     -Wpedantic
     -Wconversion
+    # -Wconversion on gcc doesn't include signedness changes, so we need to explicitly add a warning for that
+    -Wsign-conversion
     -Werror
 )
 
@@ -56,6 +58,7 @@ if(BUILD_TESTING)
 
     add_executable(picopb-tests
         tests/main.cpp
+        tests/constraints.cpp
         tests/ints.cpp
         tests/libprotobuf.cpp
         tests/writer.cpp

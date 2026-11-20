@@ -1,9 +1,9 @@
 #pragma once
 
 #include <cstdint>
-#include <expected>
 #include <picopb/picopb.hpp>
 #include <string_view>
+#include <tuple>
 
 // stands in for what the generator will emit from tests/proto/ints.proto
 namespace picopb::test_messages::ints {
@@ -30,53 +30,20 @@ struct Ints {
     bool b = false;
     Color color = Color::COLOR_UNSPECIFIED;
 
-    // writes every field, for ppb::encode
-    constexpr void write(ppb::Writer& w) const {
-        w.write_int32(1, i32);
-        w.write_int64(2, i64);
-        w.write_uint32(3, u32);
-        w.write_uint64(4, u64);
-        w.write_sint32(5, s32);
-        w.write_sint64(6, s64);
-        w.write_fixed32(7, fx32);
-        w.write_fixed64(8, fx64);
-        w.write_sfixed32(9, sfx32);
-        w.write_sfixed64(10, sfx64);
-        w.write_bool(11, b);
-        w.write_enum(12, color);
-    }
-
-    // reads one field, for ppb::decode, and returns false for a field it doesn't know
-    constexpr std::expected<bool, ppb::Error> read_field(ppb::Reader& r, ppb::Tag tag) {
-        switch (tag.field_number) {
-            case 1:
-                return r.read_int32(tag.wire, i32);
-            case 2:
-                return r.read_int64(tag.wire, i64);
-            case 3:
-                return r.read_uint32(tag.wire, u32);
-            case 4:
-                return r.read_uint64(tag.wire, u64);
-            case 5:
-                return r.read_sint32(tag.wire, s32);
-            case 6:
-                return r.read_sint64(tag.wire, s64);
-            case 7:
-                return r.read_fixed32(tag.wire, fx32);
-            case 8:
-                return r.read_fixed64(tag.wire, fx64);
-            case 9:
-                return r.read_sfixed32(tag.wire, sfx32);
-            case 10:
-                return r.read_sfixed64(tag.wire, sfx64);
-            case 11:
-                return r.read_bool(tag.wire, b);
-            case 12:
-                return r.read_enum(tag.wire, color);
-            default:
-                return false;
-        }
-    }
+    static constexpr auto _fields = std::tuple{
+        ppb::Field<1, &Ints::i32, ppb::Int32>{},
+        ppb::Field<2, &Ints::i64, ppb::Int64>{},
+        ppb::Field<3, &Ints::u32, ppb::Uint32>{},
+        ppb::Field<4, &Ints::u64, ppb::Uint64>{},
+        ppb::Field<5, &Ints::s32, ppb::Sint32>{},
+        ppb::Field<6, &Ints::s64, ppb::Sint64>{},
+        ppb::Field<7, &Ints::fx32, ppb::Fixed32>{},
+        ppb::Field<8, &Ints::fx64, ppb::Fixed64>{},
+        ppb::Field<9, &Ints::sfx32, ppb::Sfixed32>{},
+        ppb::Field<10, &Ints::sfx64, ppb::Sfixed64>{},
+        ppb::Field<11, &Ints::b, ppb::Bool>{},
+        ppb::Field<12, &Ints::color, ppb::Enum<Color>>{},
+    };
 
     bool operator==(const Ints&) const = default;
 };
