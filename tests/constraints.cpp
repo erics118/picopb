@@ -5,36 +5,46 @@
 #include <picopb/picopb.hpp>
 #include <tuple>
 
-// a named namespace, since clang flags unread members of the fake traits in an unnamed one
-namespace picopb::test_constraints {
+namespace {
 
 enum class Color : std::int32_t { RED = 1 };
 enum class Small : std::uint8_t { ONE = 1 };
 
+// Primitive fails on the missing cpp_type first, so clang sees wire as never read
 struct NoCppType {
-    static constexpr ppb::WireType wire = ppb::WireType::Varint;
+    [[maybe_unused]] static constexpr ppb::WireType wire = ppb::WireType::Varint;
 
-    static constexpr std::uint64_t to_bits(std::int32_t) { return 0; }
+    static constexpr std::uint64_t to_bits(std::int32_t /*value*/) { return 0; }
 
-    static constexpr std::int32_t from_bits(std::uint64_t) { return 0; }
+    static constexpr std::int32_t from_bits(std::uint64_t /*bits*/) { return 0; }
 };
 
 struct LenWire {
     using cpp_type = std::int32_t;
     static constexpr ppb::WireType wire = ppb::WireType::Len;
 
-    static constexpr std::uint64_t to_bits(cpp_type) { return 0; }
+    static constexpr std::uint64_t to_bits(cpp_type /*value*/) { return 0; }
 
-    static constexpr cpp_type from_bits(std::uint64_t) { return 0; }
+    static constexpr cpp_type from_bits(std::uint64_t /*bits*/) { return 0; }
 };
 
 struct WrongFromBits {
     using cpp_type = std::int32_t;
     static constexpr ppb::WireType wire = ppb::WireType::Varint;
 
-    static constexpr std::uint64_t to_bits(cpp_type) { return 0; }
+    static constexpr std::uint64_t to_bits(cpp_type /*value*/) { return 0; }
 
-    static constexpr std::int64_t from_bits(std::uint64_t) { return 0; }
+    static constexpr std::int64_t from_bits(std::uint64_t /*bits*/) { return 0; }
+};
+
+// wire type 3, a deprecated group start, isn't a value
+struct Wire3 {
+    using cpp_type = std::int32_t;
+    static constexpr ppb::WireType wire = static_cast<ppb::WireType>(3);
+
+    static constexpr std::uint64_t to_bits(cpp_type /*value*/) { return 0; }
+
+    static constexpr cpp_type from_bits(std::uint64_t /*bits*/) { return 0; }
 };
 
 // every built-in trait is a Primitive, and these aren't
@@ -54,6 +64,7 @@ static_assert(!ppb::Primitive<std::int32_t>);
 static_assert(!ppb::Primitive<NoCppType>);
 static_assert(!ppb::Primitive<LenWire>);
 static_assert(!ppb::Primitive<WrongFromBits>);
+static_assert(!ppb::Primitive<Wire3>);
 
 // Enum takes only an enum whose underlying type is std::int32_t
 template <class E>
@@ -129,4 +140,4 @@ static_assert(!ppb::Message<NotField>);
 static_assert(!ppb::Message<Borrows>);
 static_assert(!ppb::Message<Lying>);
 
-}  // namespace picopb::test_constraints
+}  // namespace

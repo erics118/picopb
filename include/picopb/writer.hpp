@@ -61,7 +61,7 @@ class Writer {
     // if the field has implicit presence, a 0 is skipped
     template <Primitive S>
     constexpr void write(std::uint32_t field_number, cpp_type_t<S> value) {
-        std::uint64_t bits = S::to_bits(value);
+        const std::uint64_t bits = S::to_bits(value);
 
         if (bits == 0) {
             return;

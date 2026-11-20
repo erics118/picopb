@@ -74,7 +74,7 @@ struct Sint32 {
     }
 
     static constexpr cpp_type from_bits(std::uint64_t bits) {
-        auto n = static_cast<std::uint32_t>(bits);
+        const auto n = static_cast<std::uint32_t>(bits);
 
         return static_cast<cpp_type>((n >> 1) ^ (0U - (n & 1U)));
     }

@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <format>
 #include <fstream>
+#include <ios>
 #include <memory>
 #include <optional>
 #include <span>
@@ -26,7 +27,7 @@ namespace gpb = google::protobuf;
 inline std::unique_ptr<gpb::DescriptorPool> load_pool() {
     auto out = std::make_unique<gpb::DescriptorPool>();
 
-    std::ifstream file(PICOPB_TEST_DESCRIPTOR_SET, std::ios::binary);
+    const std::ifstream file(PICOPB_TEST_DESCRIPTOR_SET, std::ios::binary);
 
     REQUIRE(file);
 
@@ -53,7 +54,7 @@ inline gpb::DescriptorPool& pool() {
 inline std::unique_ptr<gpb::Message> new_message(std::string_view full_name) {
     static gpb::DynamicMessageFactory factory(&pool());
 
-    const gpb::Descriptor* descriptor = pool().FindMessageTypeByName(std::string(full_name));
+    const gpb::Descriptor* const descriptor = pool().FindMessageTypeByName(std::string(full_name));
 
     REQUIRE(descriptor != nullptr);
 
@@ -116,7 +117,9 @@ inline std::vector<std::byte> from_hex(std::string_view text) {
     for (std::size_t i = 0; i + 1 < text.size(); i += 3) {
         unsigned value = 0;
 
-        std::from_chars(text.data() + i, text.data() + i + 2, value, 16);
+        const std::string_view pair = text.substr(i, 2);
+
+        std::from_chars(std::to_address(pair.begin()), std::to_address(pair.end()), value, 16);
         out.push_back(static_cast<std::byte>(value));
     }
 

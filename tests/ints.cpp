@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <picopb/picopb.hpp>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -73,7 +74,7 @@ void check_decode(std::string_view hex_bytes, bool valid) {
     REQUIRE(reference.has_value() == valid);
     REQUIRE(decoded.has_value() == valid);
 
-    if (decoded) {
+    if (decoded && reference) {
         CHECK(picopb_hex(*decoded) == test_util::hex(*reference));
     }
 }

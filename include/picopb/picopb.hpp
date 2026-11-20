@@ -58,7 +58,8 @@ constexpr std::expected<bool, Error> read_field(M& message, Reader& r, Tag tag) 
 
 // encode message into buffer and returns the number of bytes written
 template <Message M>
-constexpr std::expected<std::size_t, Error> encode(const M& message, std::span<std::byte> buffer) {
+[[nodiscard]] constexpr std::expected<std::size_t, Error> encode(const M& message,
+                                                                 std::span<std::byte> buffer) {
     Writer w{buffer};
 
     detail::write_fields(message, w);
@@ -74,25 +75,25 @@ constexpr std::expected<std::size_t, Error> encode(const M& message, std::span<s
 // missing field gets its default
 // field that appears twice gets its last value
 template <Message M>
-constexpr std::expected<M, Error> decode(std::span<const std::byte> bytes) {
+[[nodiscard]] constexpr std::expected<M, Error> decode(std::span<const std::byte> bytes) {
     M message{};
     Reader r{bytes};
 
     while (!r.done()) {
-        auto tag = r.read_tag();
+        const auto tag = r.read_tag();
 
         if (!tag) {
             return std::unexpected(tag.error());
         }
 
-        auto known = detail::read_field(message, r, *tag);
+        const auto known = detail::read_field(message, r, *tag);
 
         if (!known) {
             return std::unexpected(known.error());
         }
 
         if (!*known) {
-            auto skipped = r.skip(tag->wire);
+            const auto skipped = r.skip(tag->wire);
 
             if (!skipped) {
                 return std::unexpected(skipped.error());

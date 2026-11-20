@@ -1,4 +1,6 @@
 ---
+# every target compiler supports #pragma once
+# picopb bounds-checks before each span operator[], and .at() needs exceptions
 Checks: >
   readability-*,
   cppcoreguidelines-*,
@@ -16,7 +18,11 @@ Checks: >
   -cppcoreguidelines-avoid-c-arrays,
   -*-magic-numbers,
   -modernize-use-designated-initializers,
-  -performance-enum-size
+  -performance-enum-size,
+  -portability-avoid-pragma-once,
+  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access
 
 CheckOptions:
   readability-function-cognitive-complexity.IgnoreMacros: true
+  # messages are plain structs with public fields
+  misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true

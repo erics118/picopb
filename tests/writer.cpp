@@ -63,8 +63,9 @@ template <ppb::Primitive S>
 void check_field(std::string_view name, std::uint32_t field_number,
                  std::initializer_list<ppb::cpp_type_t<S>> values) {
     for (ppb::cpp_type_t<S> value : values) {
-        check(std::format("{}: {}", name, value),
-              [&](ppb::Writer& w) { w.write<S>(field_number, value); });
+        check(std::format("{}: {}", name, value), [&](ppb::Writer& w) {
+            w.write<S>(field_number, value);
+        });
     }
 }
 
@@ -91,9 +92,13 @@ TEST_CASE("each field type matches libprotobuf, overflows shorter buffers, and d
     check_field<ppb::Bool>("b", 11, {false, true});
 
     // std::format can't print an enum by name, and the text format names enum values
-    check("color: COLOR_UNSPECIFIED",
-          [](ppb::Writer& w) { w.write<ppb::Enum<Color>>(12, Color::COLOR_UNSPECIFIED); });
-    check("color: RED", [](ppb::Writer& w) { w.write<ppb::Enum<Color>>(12, Color::RED); });
-    check("color: NEGATIVE",
-          [](ppb::Writer& w) { w.write<ppb::Enum<Color>>(12, Color::NEGATIVE); });
+    check("color: COLOR_UNSPECIFIED", [](ppb::Writer& w) {
+        w.write<ppb::Enum<Color>>(12, Color::COLOR_UNSPECIFIED);
+    });
+    check("color: RED", [](ppb::Writer& w) {
+        w.write<ppb::Enum<Color>>(12, Color::RED);
+    });
+    check("color: NEGATIVE", [](ppb::Writer& w) {
+        w.write<ppb::Enum<Color>>(12, Color::NEGATIVE);
+    });
 }

@@ -47,7 +47,7 @@ class Reader {
                 return std::unexpected(Error::Truncated);
             }
 
-            auto b = std::to_integer<std::uint64_t>(in_[pos_++]);
+            const auto b = std::to_integer<std::uint64_t>(in_[pos_++]);
 
             value |= (b & 0x7f) << shift;
 
@@ -69,15 +69,15 @@ class Reader {
     // whether every byte has been read
     [[nodiscard]] constexpr bool done() const { return pos_ == in_.size(); }
 
-    constexpr std::expected<Tag, Error> read_tag() {
-        auto bits = read_varint();
+    [[nodiscard]] constexpr std::expected<Tag, Error> read_tag() {
+        const auto bits = read_varint();
 
         if (!bits) {
             return std::unexpected(bits.error());
         }
 
-        auto wire = static_cast<WireType>(*bits & 7);
-        std::uint64_t field_number = *bits >> 3;
+        const auto wire = static_cast<WireType>(*bits & 7);
+        const std::uint64_t field_number = *bits >> 3;
 
         if (*bits > std::numeric_limits<std::uint32_t>::max() || field_number == 0 ||
             !is_supported(wire)) {
@@ -91,10 +91,10 @@ class Reader {
     }
 
     // steps over a field's value, for a field the message doesn't know
-    constexpr std::expected<void, Error> skip(WireType wire) {
+    [[nodiscard]] constexpr std::expected<void, Error> skip(WireType wire) {
         switch (wire) {
             case WireType::Varint: {
-                auto value = read_varint();
+                const auto value = read_varint();
 
                 if (!value) {
                     return std::unexpected(value.error());
@@ -103,7 +103,7 @@ class Reader {
                 return {};
             }
             case WireType::Len: {
-                auto length = read_varint();
+                const auto length = read_varint();
 
                 if (!length) {
                     return std::unexpected(length.error());
@@ -122,7 +122,7 @@ class Reader {
     // reads a varint, i32 or i64 value, enums included, and stores S::from_bits(bits) in value
     // false means the field has another wire type, so the caller skips it like an unknown field
     template <Primitive S>
-    constexpr std::expected<bool, Error> read(WireType wire, cpp_type_t<S>& value) {
+    [[nodiscard]] constexpr std::expected<bool, Error> read(WireType wire, cpp_type_t<S>& value) {
         if (wire != S::wire) {
             return false;
         }
