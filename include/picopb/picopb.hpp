@@ -18,7 +18,9 @@ namespace ppb {
 // ensures that _fields is actually a fields table
 template <class M>
 concept Message =
-    std::default_initializable<M> && requires { requires is_field_table<M>(M::_fields); };
+    std::default_initializable<M> && requires { requires detail::is_field_table<M>(M::_fields); };
+
+namespace detail {
 
 // writes every field of message, in the order specified by _fields
 template <Message M>
@@ -52,12 +54,14 @@ constexpr std::expected<bool, Error> read_field(M& message, Reader& r, Tag tag) 
     return result;
 }
 
+}  // namespace detail
+
 // encode message into buffer and returns the number of bytes written
 template <Message M>
 constexpr std::expected<std::size_t, Error> encode(const M& message, std::span<std::byte> buffer) {
     Writer w{buffer};
 
-    write_fields(message, w);
+    detail::write_fields(message, w);
 
     if (w.overflowed()) {
         return std::unexpected(Error::BufferTooSmall);
@@ -81,7 +85,7 @@ constexpr std::expected<M, Error> decode(std::span<const std::byte> bytes) {
             return std::unexpected(tag.error());
         }
 
-        auto known = read_field(message, r, *tag);
+        auto known = detail::read_field(message, r, *tag);
 
         if (!known) {
             return std::unexpected(known.error());
