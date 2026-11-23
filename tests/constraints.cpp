@@ -75,6 +75,8 @@ static_assert(ppb::detail::FieldType<ppb::Fixed64>);
 static_assert(ppb::detail::FieldType<ppb::Sfixed32>);
 static_assert(ppb::detail::FieldType<ppb::Sfixed64>);
 static_assert(ppb::detail::FieldType<ppb::Bool>);
+static_assert(ppb::detail::FieldType<ppb::Double>);
+static_assert(ppb::detail::FieldType<ppb::Float>);
 static_assert(ppb::detail::FieldType<Color>);
 static_assert(!ppb::detail::FieldType<Small>);
 static_assert(!ppb::detail::FieldType<std::int32_t>);
@@ -122,6 +124,8 @@ struct M {
     ppb::InplaceBytes<8> inplace_data;
     std::vector<std::int32_t> numbers;
     Color color = Color::RED;
+    double d = 0;
+    float f = 0;
 
     [[nodiscard]] std::int32_t get() const { return i32; }
 };
@@ -152,6 +156,13 @@ static_assert(FieldAccepted<&M::raw, ppb::Bytes>);
 static_assert(FieldAccepted<&M::inplace_data, ppb::Bytes>);
 static_assert(!FieldAccepted<&M::inplace_data, ppb::String>);
 static_assert(!FieldAccepted<&M::numbers, ppb::Bytes>);
+
+// a double field holds a double and a float field a float, never each other or an integer
+static_assert(FieldAccepted<&M::d, ppb::Double>);
+static_assert(FieldAccepted<&M::f, ppb::Float>);
+static_assert(!FieldAccepted<&M::f, ppb::Double>);
+static_assert(!FieldAccepted<&M::d, ppb::Float>);
+static_assert(!FieldAccepted<&M::i32, ppb::Float>);
 
 // an enum field holds exactly its enum
 static_assert(FieldAccepted<&M::color, Color>);

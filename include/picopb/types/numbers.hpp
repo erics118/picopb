@@ -1,8 +1,10 @@
 #pragma once
 
+#include <bit>
 #include <concepts>
 #include <cstdint>
 #include <expected>
+#include <limits>
 #include <picopb/error.hpp>
 #include <picopb/types/field_type.hpp>
 #include <picopb/wire/reader.hpp>
@@ -146,6 +148,36 @@ struct Bool {
 
     // any value other than 0 is true
     static constexpr cpp_type from_bits(std::uint64_t bits) { return bits != 0; }
+};
+
+// protobuf's double and float are ieee 754 binary64 and binary32, written as their bits
+static_assert(std::numeric_limits<double>::is_iec559 && sizeof(double) == 8);
+static_assert(std::numeric_limits<float>::is_iec559 && sizeof(float) == 4);
+
+struct Double {
+    using cpp_type = double;
+    static constexpr detail::WireType wire = detail::WireType::I64;
+
+    static constexpr std::uint64_t to_bits(cpp_type value) {
+        return std::bit_cast<std::uint64_t>(value);
+    }
+
+    static constexpr cpp_type from_bits(std::uint64_t bits) {
+        return std::bit_cast<cpp_type>(bits);
+    }
+};
+
+struct Float {
+    using cpp_type = float;
+    static constexpr detail::WireType wire = detail::WireType::I32;
+
+    static constexpr std::uint64_t to_bits(cpp_type value) {
+        return std::bit_cast<std::uint32_t>(value);
+    }
+
+    static constexpr cpp_type from_bits(std::uint64_t bits) {
+        return std::bit_cast<cpp_type>(static_cast<std::uint32_t>(bits));
+    }
 };
 
 namespace detail {

@@ -25,6 +25,8 @@ struct Everything {
     Color color = Color::COLOR_UNSPECIFIED;
     ppb::InplaceString<16> s;
     ppb::InplaceBytes<16> bytes;
+    double d = 0;
+    float f = 0;
 
     static constexpr auto _fields = std::tuple{
         ppb::Field<1, &Everything::i32, ppb::Int32>{},
@@ -41,6 +43,8 @@ struct Everything {
         ppb::Field<12, &Everything::color, Color>{},
         ppb::Field<13, &Everything::s, ppb::String>{},
         ppb::Field<14, &Everything::bytes, ppb::Bytes>{},
+        ppb::Field<15, &Everything::d, ppb::Double>{},
+        ppb::Field<16, &Everything::f, ppb::Float>{},
     };
 };
 
