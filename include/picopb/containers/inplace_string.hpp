@@ -19,13 +19,13 @@ class InplaceString : private InplaceVector<char, N> {
    public:
     using typename Base::value_type;
 
+    using Base::assign_range;
     using Base::begin;
     using Base::data;
     using Base::empty;
     using Base::end;
     using Base::max_size;
     using Base::resize;
-    using Base::resize_and_overwrite;
     using Base::size;
 
     constexpr InplaceString() = default;

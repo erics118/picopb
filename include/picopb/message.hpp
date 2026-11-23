@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -93,23 +92,11 @@ struct Field {
 
             using Element = std::ranges::range_value_t<decltype(value)>;
 
-            auto copy = [&](Element* data, std::size_t size) {
-                std::ranges::transform(bytes, data, [](std::byte b) {
-                    return static_cast<Element>(b);
-                });
-
-                return size;
-            };
-
             // the max_size check above means this fits; std::string's and std::vector's
             // versions return nothing
-            // resize_and_overwrite skips the value initialization that resize does before the copy
-            if constexpr (requires { value.resize_and_overwrite(bytes.size(), copy); }) {
-                (void)value.resize_and_overwrite(bytes.size(), copy);
-            } else {
-                (void)value.resize(bytes.size());
-                (void)copy(std::ranges::data(value), bytes.size());
-            }
+            (void)value.assign_range(bytes | std::views::transform([](std::byte b) {
+                                         return static_cast<Element>(b);
+                                     }));
 
             return true;
         }

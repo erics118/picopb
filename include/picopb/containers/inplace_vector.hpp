@@ -4,6 +4,7 @@
 #include <array>
 #include <concepts>
 #include <cstddef>
+#include <ranges>
 #include <span>
 #include <utility>
 
@@ -52,25 +53,19 @@ class InplaceVector {
         return true;
     }
 
-    // similar to std::string::resize_and_overwrite
-    //     op(data(), count) writes up to count elements
-    //     and returns the new size, without value-initializing them first
-    template <class Op>
-        requires requires(Op op, T* data, std::size_t count) {
-            { std::move(op)(data, count) } -> std::integral;
-        }
-    [[nodiscard]] constexpr bool resize_and_overwrite(std::size_t count, Op op) {
+    // replaces the elements with the range's, without value-initializing them first
+    // if the range has more than N elements this is an error and returns false, changing nothing
+    template <std::ranges::sized_range R>
+        requires std::convertible_to<std::ranges::range_reference_t<R>, T>
+    [[nodiscard]] constexpr bool assign_range(R&& range) {
+        const auto count = static_cast<std::size_t>(std::ranges::size(range));
+
         if (count > N) {
             return false;
         }
 
-        const auto size = static_cast<std::size_t>(std::move(op)(elems_.data(), count));
-
-        if (size > count) {
-            return false;
-        }
-
-        size_ = size;
+        std::ranges::copy(std::forward<R>(range), elems_.begin());
+        size_ = count;
         return true;
     }
 

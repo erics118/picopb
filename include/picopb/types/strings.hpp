@@ -3,6 +3,7 @@
 #include <concepts>
 #include <cstddef>
 #include <ranges>
+#include <span>
 
 namespace ppb {
 
@@ -12,9 +13,10 @@ namespace detail {
 template <class C>
 concept ByteContainer =
     std::ranges::contiguous_range<C> && std::ranges::sized_range<C> &&
-    sizeof(std::ranges::range_value_t<C>) == 1 && requires(C& container, std::size_t size) {
+    sizeof(std::ranges::range_value_t<C>) == 1 &&
+    requires(C& container, std::span<const std::ranges::range_value_t<C>> range) {
         { container.max_size() } -> std::convertible_to<std::size_t>;
-        container.resize(size);
+        container.assign_range(range);
     };
 
 }  // namespace detail

@@ -53,6 +53,12 @@ struct Wire3 {
     static constexpr cpp_type from_bits(std::uint64_t /*bits*/) { return 0; }
 };
 
+// a byte vector without assign_range, which decode copies a string or bytes value with
+struct NoAssignRange : std::vector<std::byte> {
+    template <class R>
+    void assign_range(R&&) = delete;
+};
+
 // whether t.view() compiles, as a concept so a missing or private view() fails softly
 template <class T>
 concept HasView = requires(const T& t) { t.view(); };
@@ -92,6 +98,7 @@ static_assert(ppb::BytesContainer<ppb::InplaceBytes<8>>);
 static_assert(!ppb::BytesContainer<std::array<char, 8>>);
 static_assert(!ppb::BytesContainer<std::string_view>);
 static_assert(!ppb::BytesContainer<std::vector<std::int32_t>>);
+static_assert(!ppb::BytesContainer<NoAssignRange>);
 
 // a string field's container: the same, with char elements
 static_assert(ppb::StringContainer<std::string>);

@@ -7,10 +7,8 @@
 #include <iterator>
 #include <picopb/picopb.hpp>
 #include <ranges>
-#include <span>
 #include <string>
 #include <string_view>
-#include <utility>
 
 namespace {
 
@@ -58,47 +56,9 @@ static_assert([] {
 
 static_assert([] {
     Bytes4 bytes;
-    const bool wrote = bytes.resize_and_overwrite(2, [](std::byte* data, std::size_t n) {
-        std::ranges::fill(std::span(data, n), std::byte{3});
+    const std::array in{std::byte{1}, std::byte{2}};
 
-        return n;
-    });
-
-    return wrote && bytes.size() == 2 && at(bytes, 1) == std::byte{3};
-}());
-
-// whether container.resize_and_overwrite(1, op) is a valid call
-template <class C, class Op>
-concept Overwritable =
-    requires(C container, Op op) { container.resize_and_overwrite(1uz, std::move(op)); };
-
-// an op that can only be moved and only called as an rvalue, which std::string accepts
-template <class T>
-struct MoveOnlyOp {
-    MoveOnlyOp() = default;
-    MoveOnlyOp(MoveOnlyOp&&) = default;
-    MoveOnlyOp(const MoveOnlyOp&) = delete;
-
-    constexpr std::size_t operator()(T*, std::size_t n) && { return n; }
-};
-
-using BytesOp = std::size_t (*)(std::byte*, std::size_t);
-using WrongParameters = std::size_t (*)(int);
-using WrongReturn = double (*)(std::byte*, std::size_t);
-
-static_assert(Overwritable<Bytes4, BytesOp>);
-static_assert(!Overwritable<Bytes4, WrongParameters>);
-static_assert(!Overwritable<Bytes4, WrongReturn>);
-static_assert(!Overwritable<ppb::InplaceString<4>, WrongParameters>);
-static_assert(!Overwritable<ppb::InplaceString<4>, double (*)(char*, std::size_t)>);
-
-static_assert([] {
-    Bytes4 bytes;
-    ppb::InplaceString<4> name;
-
-    return bytes.resize_and_overwrite(2, MoveOnlyOp<std::byte>{}) &&
-           name.resize_and_overwrite(3, MoveOnlyOp<char>{}) && bytes.size() == 2 &&
-           name.size() == 3;
+    return bytes.assign_range(in) && bytes.size() == 2 && at(bytes, 1) == std::byte{2};
 }());
 
 }  // namespace
@@ -210,61 +170,32 @@ TEST_CASE("InplaceVector holds element types that aren't trivial") {
     CHECK(at(names, 1).empty());
 }
 
-TEST_CASE("InplaceVector::resize_and_overwrite lets op write the elements, then takes its size") {
-    Bytes4 bytes = counting(1);
-    const std::byte* buffer = nullptr;
-    std::size_t count = 0;
+TEST_CASE("InplaceVector::assign_range replaces the elements with the range's") {
+    Bytes4 bytes = counting(3);
+    const std::array in{std::byte{7}, std::byte{8}};
 
-    CHECK(bytes.resize_and_overwrite(4, [&](std::byte* data, std::size_t n) {
-        buffer = data;
-        count = n;
-        std::ranges::fill(std::span(data, n).subspan(1), std::byte{7});
+    CHECK(bytes.assign_range(in));
+    CHECK(std::ranges::equal(bytes, in));
 
-        return 3uz;
-    }));
-
-    CHECK(buffer == bytes.data());
-    CHECK(count == 4);
-    CHECK(std::ranges::equal(bytes, std::array{std::byte{1}, std::byte{7}, std::byte{7}}));
+    CHECK(bytes.assign_range(std::array<std::byte, 0>{}));
+    CHECK(bytes.empty());
 }
 
-TEST_CASE("InplaceVector::resize_and_overwrite past its capacity returns false, skipping op") {
+TEST_CASE("InplaceVector::assign_range past its capacity returns false and changes nothing") {
     Bytes4 bytes = counting(2);
-    bool called = false;
 
-    CHECK_FALSE(bytes.resize_and_overwrite(5, [&](std::byte*, std::size_t n) {
-        called = true;
-
-        return n;
-    }));
-
-    CHECK_FALSE(called);
+    CHECK_FALSE(bytes.assign_range(std::array<std::byte, 5>{}));
     CHECK(bytes == counting(2));
 }
 
-TEST_CASE("InplaceVector::resize_and_overwrite returns false when op returns more than count") {
-    Bytes4 bytes = counting(1);
-
-    CHECK_FALSE(bytes.resize_and_overwrite(2, [](std::byte*, std::size_t) {
-        return 3uz;
-    }));
-
-    CHECK(bytes.size() == 1);
-}
-
-TEST_CASE("InplaceString::resize_and_overwrite lets op write the chars, then takes its size") {
+TEST_CASE("InplaceString::assign_range takes text up to its capacity") {
     ppb::InplaceString<4> name;
 
-    CHECK(name.resize_and_overwrite(4, [](char* data, std::size_t) {
-        std::ranges::copy(std::string_view{"imu"}, data);
-
-        return 3uz;
-    }));
-
+    CHECK(name.assign_range(std::string_view{"imu"}));
     CHECK(name == "imu");
-    CHECK_FALSE(name.resize_and_overwrite(5, [](char*, std::size_t n) {
-        return n;
-    }));
+
+    CHECK_FALSE(name.assign_range(std::string_view{"toolong"}));
+    CHECK(name == "imu");
 }
 
 TEST_CASE("InplaceString::resize past its capacity returns false and changes nothing") {
