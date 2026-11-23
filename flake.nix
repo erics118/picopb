@@ -45,6 +45,7 @@
           src = pkgs.lib.fileset.toSource {
             root = ./.;
             fileset = pkgs.lib.fileset.unions [
+              ./.clang-tidy
               ./CMakeLists.txt
               ./cmake
               ./include
@@ -101,6 +102,28 @@
                 "-DBUILD_TESTING=OFF"
               ];
               installPhase = "install -D picopb-example $out/bin/picopb-example";
+            };
+
+            # clang-tidy on every file the build compiles; any warning fails it
+            lint = llvm.stdenv.mkDerivation {
+              name = "picopb-lint";
+              inherit src;
+              inherit (shell) hardeningDisable CMAKE_GENERATOR;
+              nativeBuildInputs = with pkgs; [
+                cmake
+                ninja
+                protobuf
+                llvm.clang-tools
+                just
+              ];
+              buildInputs = with pkgs; [
+                doctest
+                protobuf
+              ];
+              # just lint configures and builds in ./build itself
+              dontUseCmakeConfigure = true;
+              buildPhase = "just lint";
+              installPhase = "touch $out";
             };
 
             # fail if the rp2040 encoder or decoder needs the heap or exceptions

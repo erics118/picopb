@@ -31,5 +31,11 @@ check-no-heap:
         tools/check-no-heap.sh build/no_heap-$opt.o decode_example || exit 1; \
     done
 
-# the tests plus the no-heap check
-check: test check-no-heap
+# clang-tidy on every file the build compiles and the picopb headers they include
+# any warning fails it
+lint: build
+    run-clang-tidy -p build -quiet -warnings-as-errors '*' \
+        -header-filter '{{ justfile_directory() }}/(include|tests|examples)/.*'
+
+# the tests, the no-heap check and clang-tidy
+check: test check-no-heap lint
