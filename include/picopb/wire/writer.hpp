@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <picopb/types/numbers.hpp>
 #include <picopb/wire/wire_type.hpp>
 #include <span>
 
@@ -93,29 +92,6 @@ class Writer {
     template <class Byte>
         requires(sizeof(Byte) == 1)
     constexpr void write_len(std::span<const Byte> bytes) {
-        write_varint(bytes.size());
-        put_bytes(bytes);
-    }
-
-    // writes a field and value, even a 0; skipping a 0 is the field's job
-    template <Primitive S>
-    constexpr void write(std::uint32_t field_number, cpp_type_t<S> value) {
-        const std::uint64_t bits = S::to_bits(value);
-
-        write_tag(field_number, S::wire);
-
-        if constexpr (S::wire == WireType::Varint) {
-            write_varint(bits);
-        } else {
-            write_little_endian(bits, fixed_size(S::wire));
-        }
-    }
-
-    // writes a length-delimited field: its tag, the length, then the bytes
-    template <class Byte>
-        requires(sizeof(Byte) == 1)
-    constexpr void write_bytes(std::uint32_t field_number, std::span<const Byte> bytes) {
-        write_tag(field_number, WireType::Len);
         write_varint(bytes.size());
         put_bytes(bytes);
     }

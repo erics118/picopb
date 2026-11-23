@@ -5,7 +5,6 @@
 #include <expected>
 #include <limits>
 #include <picopb/error.hpp>
-#include <picopb/types/numbers.hpp>
 #include <picopb/wire/wire_type.hpp>
 #include <span>
 
@@ -151,55 +150,6 @@ class Reader {
         }
 
         return std::unexpected(Error::InvalidTag);
-    }
-
-    // reads a varint, i32 or i64 value, enums included, and stores S::from_bits(bits) in value
-    // false means the field has another wire type, so the caller skips it like an unknown field
-    template <Primitive S>
-    [[nodiscard]] constexpr std::expected<bool, Error> read(WireType wire, cpp_type_t<S>& value) {
-        if (wire != S::wire) {
-            return false;
-        }
-
-        std::expected<std::uint64_t, Error> bits = 0;
-
-        if constexpr (S::wire == WireType::Varint) {
-            bits = read_varint();
-        } else {
-            bits = read_little_endian(fixed_size(S::wire));
-        }
-
-        if (!bits) {
-            return std::unexpected(bits.error());
-        }
-
-        value = S::from_bits(*bits);
-
-        return true;
-    }
-
-    // reads a length-delimited value and points bytes at it, inside the input
-    // false means the field has another wire type, so the caller skips it like an unknown field
-    [[nodiscard]] constexpr std::expected<bool, Error> read_bytes(
-        WireType wire, std::span<const std::byte>& bytes) {
-        if (wire != WireType::Len) {
-            return false;
-        }
-
-        const auto length = read_varint();
-
-        if (!length) {
-            return std::unexpected(length.error());
-        }
-
-        if (*length > in_.size() - pos_) {
-            return std::unexpected(Error::Truncated);
-        }
-
-        bytes = in_.subspan(pos_, static_cast<std::size_t>(*length));
-        pos_ += bytes.size();
-
-        return true;
     }
 };
 

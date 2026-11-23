@@ -2,6 +2,14 @@
 
 #include <concepts>
 #include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <picopb/error.hpp>
+#include <picopb/types/field_type.hpp>
+#include <picopb/utf8.hpp>
+#include <picopb/wire/reader.hpp>
+#include <picopb/wire/wire_type.hpp>
+#include <picopb/wire/writer.hpp>
 #include <ranges>
 #include <span>
 
@@ -35,23 +43,92 @@ concept BytesContainer =
 }  // namespace detail
 
 // protobuf string type: utf-8 text
-struct String {
-    template <class C>
-    static constexpr bool stores = detail::StringContainer<C>;
+struct String {};
 
-    static constexpr bool validates_utf8 = true;
+// protobuf bytes type
+struct Bytes {};
+
+namespace detail {
+
+// an empty value isn't written, since the field has implicit presence
+template <class V>
+constexpr void write_len_field(Writer& w, std::uint32_t number, const V& value) {
+    if (std::ranges::empty(value)) {
+        return;
+    }
+
+    w.write_tag(number, WireType::Len);
+    w.write_len(std::span(std::ranges::data(value), std::ranges::size(value)));
+}
+
+template <bool ValidatesUtf8, class V>
+constexpr std::expected<bool, Error> read_len_field(Reader& r, WireType wire, V& value) {
+    if (wire != WireType::Len) {
+        return false;
+    }
+
+    const auto bytes = r.read_len();
+
+    if (!bytes) {
+        return std::unexpected(bytes.error());
+    }
+
+    if (bytes->size() > value.max_size()) {
+        return std::unexpected(Error::CapacityExceeded);
+    }
+
+    if constexpr (ValidatesUtf8) {
+        if (!is_valid_utf8(*bytes)) {
+            return std::unexpected(Error::InvalidUtf8);
+        }
+    }
+
+    using Element = std::ranges::range_value_t<V>;
+
+    // the max_size check above means this fits; std::string's and std::vector's
+    // versions return nothing
+    (void)value.assign_range(*bytes | std::views::transform([](std::byte b) {
+        return static_cast<Element>(b);
+    }));
+
+    return true;
+}
+
+template <>
+struct FieldTypeTraits<String> {
+    template <class V>
+    static constexpr bool stores = StringContainer<V>;
+
+    template <class V>
+    static constexpr void write(Writer& w, std::uint32_t number, const V& value) {
+        write_len_field(w, number, value);
+    }
+
+    // proto3 rejects a string that isn't valid utf-8
+    template <class V>
+    [[nodiscard]] static constexpr std::expected<bool, Error> read(Reader& r, WireType wire,
+                                                                   V& value) {
+        return read_len_field<true>(r, wire, value);
+    }
 };
 
-// prptobuf bytes type
-struct Bytes {
-    template <class C>
-    static constexpr bool stores = detail::BytesContainer<C>;
+template <>
+struct FieldTypeTraits<Bytes> {
+    template <class V>
+    static constexpr bool stores = BytesContainer<V>;
 
-    static constexpr bool validates_utf8 = false;
+    template <class V>
+    static constexpr void write(Writer& w, std::uint32_t number, const V& value) {
+        write_len_field(w, number, value);
+    }
+
+    template <class V>
+    [[nodiscard]] static constexpr std::expected<bool, Error> read(Reader& r, WireType wire,
+                                                                   V& value) {
+        return read_len_field<false>(r, wire, value);
+    }
 };
 
-// if the type is represented on the wire starting with its length then that many bytes
-template <class T>
-concept LengthDelimited = std::same_as<T, String> || std::same_as<T, Bytes>;
+}  // namespace detail
 
 }  // namespace ppb

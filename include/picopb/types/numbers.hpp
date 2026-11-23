@@ -2,24 +2,28 @@
 
 #include <concepts>
 #include <cstdint>
+#include <expected>
+#include <picopb/error.hpp>
+#include <picopb/types/field_type.hpp>
+#include <picopb/wire/reader.hpp>
 #include <picopb/wire/wire_type.hpp>
+#include <picopb/wire/writer.hpp>
 #include <type_traits>
 #include <utility>
 
 namespace ppb {
 
-// the C++ type that holds a value of primitive type S, such as std::int32_t for ppb::Sint32
-template <class S>
-using cpp_type_t = S::cpp_type;
+namespace detail {
 
-// a struct that represents a protobuf primitive type
-// has a function defining how to convert to and from its wire format
+// a number type: one C++ value written as one varint, i32 or i64 wire value
 template <class S>
-concept Primitive = requires(cpp_type_t<S> value, std::uint64_t bits) {
-    requires S::wire == detail::WireType::Varint || detail::fixed_size(S::wire) != 0;
+concept NumberType = requires(S::cpp_type value, std::uint64_t bits) {
+    requires S::wire == WireType::Varint || fixed_size(S::wire) != 0;
     { S::to_bits(value) } -> std::same_as<std::uint64_t>;
-    { S::from_bits(bits) } -> std::same_as<cpp_type_t<S>>;
+    { S::from_bits(bits) } -> std::same_as<typename S::cpp_type>;
 };
+
+}  // namespace detail
 
 struct Int32 {
     using cpp_type = std::int32_t;
@@ -144,23 +148,85 @@ struct Bool {
     static constexpr cpp_type from_bits(std::uint64_t bits) { return bits != 0; }
 };
 
-// enums are encoded as if it were an int32 (ie as a varint)
-// values fit inside a std::int32_t, so they are generated as so
-// `requires` that E is an enum and matches the type of a std::int32_t
+namespace detail {
+
+// an enum is written as if it were an int32, and keeps values it has no name for
 template <class E>
-    requires std::is_enum_v<E> && std::is_same_v<std::underlying_type_t<E>, std::int32_t>
-struct Enum {
+struct EnumNumber {
     using cpp_type = E;
-    static constexpr detail::WireType wire = detail::WireType::Varint;
+    static constexpr WireType wire = WireType::Varint;
 
     static constexpr std::uint64_t to_bits(cpp_type value) {
         return Int32::to_bits(std::to_underlying(value));
     }
 
-    // an enum is read like an int32, and keeps values it has no name for
     static constexpr cpp_type from_bits(std::uint64_t bits) {
         return static_cast<cpp_type>(Int32::from_bits(bits));
     }
 };
+
+template <class S>
+    requires NumberType<S>
+struct FieldTypeTraits<S> {
+    template <class V>
+    static constexpr bool stores = std::same_as<V, typename S::cpp_type>;
+
+    // a 0 isn't written, since the field has implicit presence
+    static constexpr void write(Writer& w, std::uint32_t number, const S::cpp_type& value) {
+        const std::uint64_t bits = S::to_bits(value);
+
+        if (bits == 0) {
+            return;
+        }
+
+        w.write_tag(number, S::wire);
+
+        if constexpr (S::wire == WireType::Varint) {
+            w.write_varint(bits);
+        } else if constexpr (S::wire == WireType::I32) {
+            w.write_i32(static_cast<std::uint32_t>(bits));
+        } else {
+            w.write_i64(bits);
+        }
+    }
+
+    [[nodiscard]] static constexpr std::expected<bool, Error> read(Reader& r, WireType wire,
+                                                                   S::cpp_type& value) {
+        if (wire != S::wire) {
+            return false;
+        }
+
+        std::expected<std::uint64_t, Error> bits = 0;
+
+        if constexpr (S::wire == WireType::Varint) {
+            bits = r.read_varint();
+        } else if constexpr (S::wire == WireType::I32) {
+            const auto i32 = r.read_i32();
+
+            if (!i32) {
+                return std::unexpected(i32.error());
+            }
+
+            bits = *i32;
+        } else {
+            bits = r.read_i64();
+        }
+
+        if (!bits) {
+            return std::unexpected(bits.error());
+        }
+
+        value = S::from_bits(*bits);
+
+        return true;
+    }
+};
+
+// an enum is its own field type, when its values fit an int32 as protobuf requires
+template <class E>
+    requires std::is_enum_v<E> && std::same_as<std::underlying_type_t<E>, std::int32_t>
+struct FieldTypeTraits<E> : FieldTypeTraits<EnumNumber<E>> {};
+
+}  // namespace detail
 
 }  // namespace ppb

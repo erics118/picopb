@@ -31,18 +31,12 @@ struct Ints {
     Color color = Color::COLOR_UNSPECIFIED;
 
     static constexpr auto _fields = std::tuple{
-        ppb::Field<1, &Ints::i32, ppb::Int32>{},
-        ppb::Field<2, &Ints::i64, ppb::Int64>{},
-        ppb::Field<3, &Ints::u32, ppb::Uint32>{},
-        ppb::Field<4, &Ints::u64, ppb::Uint64>{},
-        ppb::Field<5, &Ints::s32, ppb::Sint32>{},
-        ppb::Field<6, &Ints::s64, ppb::Sint64>{},
-        ppb::Field<7, &Ints::fx32, ppb::Fixed32>{},
-        ppb::Field<8, &Ints::fx64, ppb::Fixed64>{},
-        ppb::Field<9, &Ints::sfx32, ppb::Sfixed32>{},
-        ppb::Field<10, &Ints::sfx64, ppb::Sfixed64>{},
-        ppb::Field<11, &Ints::b, ppb::Bool>{},
-        ppb::Field<12, &Ints::color, ppb::Enum<Color>>{},
+        ppb::Field<1, &Ints::i32, ppb::Int32>{},      ppb::Field<2, &Ints::i64, ppb::Int64>{},
+        ppb::Field<3, &Ints::u32, ppb::Uint32>{},     ppb::Field<4, &Ints::u64, ppb::Uint64>{},
+        ppb::Field<5, &Ints::s32, ppb::Sint32>{},     ppb::Field<6, &Ints::s64, ppb::Sint64>{},
+        ppb::Field<7, &Ints::fx32, ppb::Fixed32>{},   ppb::Field<8, &Ints::fx64, ppb::Fixed64>{},
+        ppb::Field<9, &Ints::sfx32, ppb::Sfixed32>{}, ppb::Field<10, &Ints::sfx64, ppb::Sfixed64>{},
+        ppb::Field<11, &Ints::b, ppb::Bool>{},        ppb::Field<12, &Ints::color, Color>{},
     };
 
     bool operator==(const Ints&) const = default;

@@ -62,9 +62,9 @@ void check(std::string_view text, std::invocable<ppb::detail::Writer&> auto writ
 
 // runs check for each value of one Ints field, written by its table entry
 // the entry skips a 0, so the 0 cases check implicit presence
-template <std::uint32_t N, auto Member, ppb::Primitive S>
-void check_field(std::string_view name, std::initializer_list<ppb::cpp_type_t<S>> values) {
-    for (ppb::cpp_type_t<S> value : values) {
+template <std::uint32_t N, auto Member, class S>
+void check_field(std::string_view name, std::initializer_list<typename S::cpp_type> values) {
+    for (typename S::cpp_type value : values) {
         Ints message{};
         message.*Member = value;
 
@@ -77,7 +77,7 @@ void check_field(std::string_view name, std::initializer_list<ppb::cpp_type_t<S>
 // std::format can't print an enum by name, and the text format names enum values
 void check_color(std::string_view text, Color color) {
     check(text, [&](ppb::detail::Writer& w) {
-        ppb::Field<12, &Ints::color, ppb::Enum<Color>>::write(w, Ints{.color = color});
+        ppb::Field<12, &Ints::color, Color>::write(w, Ints{.color = color});
     });
 }
 
@@ -110,11 +110,12 @@ TEST_CASE("each field type matches libprotobuf, overflows shorter buffers, and d
     check_color("color: NEGATIVE", Color::NEGATIVE);
 }
 
-TEST_CASE("Writer::write writes a 0, since skipping it is the field's job") {
+TEST_CASE("Writer writes a 0 varint, since skipping a 0 is the field type's job") {
     std::array<std::byte, 2> buffer{};
     ppb::detail::Writer w{buffer};
 
-    w.write<ppb::Int32>(1, 0);
+    w.write_tag(1, ppb::detail::WireType::Varint);
+    w.write_varint(0);
 
     CHECK_FALSE(w.overflowed());
     CHECK(test_util::hex(std::span(buffer).first(w.size())) == "08 00");

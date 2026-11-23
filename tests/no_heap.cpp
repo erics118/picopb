@@ -38,7 +38,7 @@ struct Everything {
         ppb::Field<9, &Everything::sfx32, ppb::Sfixed32>{},
         ppb::Field<10, &Everything::sfx64, ppb::Sfixed64>{},
         ppb::Field<11, &Everything::b, ppb::Bool>{},
-        ppb::Field<12, &Everything::color, ppb::Enum<Color>>{},
+        ppb::Field<12, &Everything::color, Color>{},
         ppb::Field<13, &Everything::s, ppb::String>{},
         ppb::Field<14, &Everything::bytes, ppb::Bytes>{},
     };

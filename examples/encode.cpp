@@ -25,7 +25,7 @@ struct Reading {
         ppb::Field<2, &Reading::name, ppb::String>{},
         ppb::Field<7, &Reading::fx32, ppb::Fixed32>{},
         ppb::Field<8, &Reading::fx64, ppb::Fixed64>{},
-        ppb::Field<12, &Reading::color, ppb::Enum<Color>>{},
+        ppb::Field<12, &Reading::color, Color>{},
     };
 
     bool operator==(const Reading&) const = default;

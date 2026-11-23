@@ -16,7 +16,7 @@ namespace {
 enum class Color : std::int32_t { RED = 1 };
 enum class Small : std::uint8_t { ONE = 1 };
 
-// Primitive fails on the missing cpp_type first, so clang sees wire as never read
+// the number check fails on the missing cpp_type first, so clang sees wire as never read
 struct NoCppType {
     [[maybe_unused]] static constexpr ppb::detail::WireType wire = ppb::detail::WireType::Varint;
 
@@ -63,32 +63,25 @@ struct NoAssignRange : std::vector<std::byte> {
 template <class T>
 concept HasView = requires(const T& t) { t.view(); };
 
-// every built-in trait is a Primitive, and these aren't
-static_assert(ppb::Primitive<ppb::Int32>);
-static_assert(ppb::Primitive<ppb::Int64>);
-static_assert(ppb::Primitive<ppb::Uint32>);
-static_assert(ppb::Primitive<ppb::Uint64>);
-static_assert(ppb::Primitive<ppb::Sint32>);
-static_assert(ppb::Primitive<ppb::Sint64>);
-static_assert(ppb::Primitive<ppb::Fixed32>);
-static_assert(ppb::Primitive<ppb::Fixed64>);
-static_assert(ppb::Primitive<ppb::Sfixed32>);
-static_assert(ppb::Primitive<ppb::Sfixed64>);
-static_assert(ppb::Primitive<ppb::Bool>);
-static_assert(ppb::Primitive<ppb::Enum<Color>>);
-static_assert(!ppb::Primitive<std::int32_t>);
-static_assert(!ppb::Primitive<NoCppType>);
-static_assert(!ppb::Primitive<LenWire>);
-static_assert(!ppb::Primitive<WrongFromBits>);
-static_assert(!ppb::Primitive<Wire3>);
-
-// Enum takes only an enum whose underlying type is std::int32_t
-template <class E>
-concept EnumAccepted = requires { typename ppb::Enum<E>; };
-
-static_assert(EnumAccepted<Color>);
-static_assert(!EnumAccepted<Small>);
-static_assert(!EnumAccepted<std::int32_t>);
+// every built-in number type and an int32 enum are field types, and these aren't
+static_assert(ppb::detail::FieldType<ppb::Int32>);
+static_assert(ppb::detail::FieldType<ppb::Int64>);
+static_assert(ppb::detail::FieldType<ppb::Uint32>);
+static_assert(ppb::detail::FieldType<ppb::Uint64>);
+static_assert(ppb::detail::FieldType<ppb::Sint32>);
+static_assert(ppb::detail::FieldType<ppb::Sint64>);
+static_assert(ppb::detail::FieldType<ppb::Fixed32>);
+static_assert(ppb::detail::FieldType<ppb::Fixed64>);
+static_assert(ppb::detail::FieldType<ppb::Sfixed32>);
+static_assert(ppb::detail::FieldType<ppb::Sfixed64>);
+static_assert(ppb::detail::FieldType<ppb::Bool>);
+static_assert(ppb::detail::FieldType<Color>);
+static_assert(!ppb::detail::FieldType<Small>);
+static_assert(!ppb::detail::FieldType<std::int32_t>);
+static_assert(!ppb::detail::FieldType<NoCppType>);
+static_assert(!ppb::detail::FieldType<LenWire>);
+static_assert(!ppb::detail::FieldType<WrongFromBits>);
+static_assert(!ppb::detail::FieldType<Wire3>);
 
 // a bytes field's container: resizable, contiguous one-byte elements
 static_assert(ppb::detail::BytesContainer<std::string>);
@@ -114,18 +107,9 @@ static_assert(!std::convertible_to<ppb::InplaceString<8>, ppb::InplaceVector<cha
 static_assert(std::convertible_to<const ppb::InplaceString<8>&, std::string_view>);
 static_assert(!HasView<ppb::InplaceString<8>>);
 
-// a string needs char elements, while bytes also take unsigned char and std::byte
-static_assert(ppb::String::stores<std::string>);
-static_assert(ppb::String::stores<ppb::InplaceString<8>>);
-static_assert(!ppb::String::stores<std::vector<std::byte>>);
-static_assert(ppb::Bytes::stores<std::string>);
-static_assert(ppb::Bytes::stores<std::vector<unsigned char>>);
-static_assert(ppb::Bytes::stores<ppb::InplaceBytes<8>>);
-static_assert(!ppb::Bytes::stores<std::vector<std::int32_t>>);
-
-// strings and bytes aren't primitives, which are one number on the wire
-static_assert(!ppb::Primitive<ppb::String>);
-static_assert(!ppb::Primitive<ppb::Bytes>);
+// strings and bytes are field types too
+static_assert(ppb::detail::FieldType<ppb::String>);
+static_assert(ppb::detail::FieldType<ppb::Bytes>);
 
 struct M {
     std::int32_t i32 = 0;
@@ -134,6 +118,10 @@ struct M {
     std::string text;
     ppb::InplaceString<8> inplace_text;
     std::vector<std::byte> data;
+    std::vector<unsigned char> raw;
+    ppb::InplaceBytes<8> inplace_data;
+    std::vector<std::int32_t> numbers;
+    Color color = Color::RED;
 
     [[nodiscard]] std::int32_t get() const { return i32; }
 };
@@ -158,6 +146,17 @@ static_assert(FieldAccepted<&M::text, ppb::Bytes>);
 static_assert(!FieldAccepted<&M::data, ppb::String>);
 static_assert(!FieldAccepted<&M::i32, ppb::String>);
 static_assert(!FieldAccepted<&M::text, ppb::Int32>);
+
+// a string needs char elements, while bytes also take unsigned char and std::byte
+static_assert(FieldAccepted<&M::raw, ppb::Bytes>);
+static_assert(FieldAccepted<&M::inplace_data, ppb::Bytes>);
+static_assert(!FieldAccepted<&M::inplace_data, ppb::String>);
+static_assert(!FieldAccepted<&M::numbers, ppb::Bytes>);
+
+// an enum field holds exactly its enum
+static_assert(FieldAccepted<&M::color, Color>);
+static_assert(!FieldAccepted<&M::i32, Color>);
+static_assert(!FieldAccepted<&M::color, ppb::Int32>);
 
 struct Good {
     std::int32_t i32 = 0;

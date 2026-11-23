@@ -7,6 +7,7 @@
 #include <picopb/containers/inplace_vector.hpp>  // IWYU pragma: export
 #include <picopb/error.hpp>                      // IWYU pragma: export
 #include <picopb/message.hpp>                    // IWYU pragma: export
+#include <picopb/types/field_type.hpp>           // IWYU pragma: export
 #include <picopb/types/numbers.hpp>              // IWYU pragma: export
 #include <picopb/types/strings.hpp>              // IWYU pragma: export
 #include <picopb/utf8.hpp>                       // IWYU pragma: export
