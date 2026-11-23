@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 
+#include "compare.hpp"
 #include "libprotobuf.hpp"
 #include "limits.hpp"
 
@@ -53,31 +54,8 @@ constexpr std::string_view min_text =
     "i32: -2147483648 i64: -9223372036854775808 s32: -2147483648 s64: -9223372036854775808 "
     "sfx32: -2147483648 sfx64: -9223372036854775808 color: NEGATIVE";
 
-// the bytes ppb::encode writes for message, as hex text
-std::string picopb_hex(const Ints& message) {
-    std::vector<std::byte> buffer(128);
-    auto size = ppb::encode(message, buffer);
-
-    REQUIRE(size.has_value());
-
-    return test_util::hex(std::span(buffer).first(*size));
-}
-
-// libprotobuf accepts the bytes only if valid, picopb agrees, and both decode the same message
-void check_decode(std::string_view hex_bytes, bool valid) {
-    INFO(hex_bytes);
-
-    std::vector<std::byte> bytes = test_util::from_hex(hex_bytes);
-    auto reference = test_util::libprotobuf_reencode<Ints>(bytes);
-    auto decoded = ppb::decode<Ints>(bytes);
-
-    REQUIRE(reference.has_value() == valid);
-    REQUIRE(decoded.has_value() == valid);
-
-    if (decoded && reference) {
-        CHECK(picopb_hex(*decoded) == test_util::hex(*reference));
-    }
-}
+using test_util::check_decode;
+using test_util::picopb_hex;
 
 // decode runs at compile time: the encoding docs' example, an int32 field 1 set to 150
 constexpr std::array one_fifty{std::byte{0x08}, std::byte{0x96}, std::byte{0x01}};
@@ -136,56 +114,56 @@ TEST_CASE("Ints decodes libprotobuf's bytes back to the same message") {
 TEST_CASE("ppb::decode accepts and rejects exactly the bytes libprotobuf does") {
     SUBCASE("valid input") {
         // field 1 twice, so the last value wins
-        check_decode("08 01 08 02", true);
+        check_decode<Ints>("08 01 08 02", true);
 
         // fields 13 to 16 aren't in Ints, one per wire type, so they're skipped
-        check_decode("68 05", true);
-        check_decode("72 02 aa bb", true);
-        check_decode("7d 01 02 03 04", true);
-        check_decode("81 01 01 02 03 04 05 06 07 08", true);
+        check_decode<Ints>("68 05", true);
+        check_decode<Ints>("72 02 aa bb", true);
+        check_decode<Ints>("7d 01 02 03 04", true);
+        check_decode<Ints>("81 01 01 02 03 04 05 06 07 08", true);
 
         // field 1 is an int32 but arrives with the i32 wire type
-        check_decode("0d 01 02 03 04", true);
+        check_decode<Ints>("0d 01 02 03 04", true);
 
         // a bool of 2, and an enum value Color has no name for
-        check_decode("58 02", true);
-        check_decode("60 05", true);
+        check_decode<Ints>("58 02", true);
+        check_decode<Ints>("60 05", true);
 
         // an int32 of -1 as 10 bytes, and an int32 whose varint is wider than 32 bits
-        check_decode("08 ff ff ff ff ff ff ff ff ff 01", true);
-        check_decode("08 80 80 80 80 10", true);
+        check_decode<Ints>("08 ff ff ff ff ff ff ff ff ff 01", true);
+        check_decode<Ints>("08 80 80 80 80 10", true);
 
         // a 10-byte varint whose last byte has bits beyond the 64th
-        check_decode("08 ff ff ff ff ff ff ff ff ff 7f", true);
+        check_decode<Ints>("08 ff ff ff ff ff ff ff ff ff 7f", true);
 
         // the largest field number, 2^29 - 1, as an unknown field
-        check_decode("f8 ff ff ff 0f 01", true);
+        check_decode<Ints>("f8 ff ff ff 0f 01", true);
     }
 
     SUBCASE("malformed input") {
         // a tag with no value, and a varint cut off in the middle
-        check_decode("08", false);
-        check_decode("08 80", false);
+        check_decode<Ints>("08", false);
+        check_decode<Ints>("08 80", false);
 
         // a varint of 11 bytes
-        check_decode("08 ff ff ff ff ff ff ff ff ff ff 01", false);
+        check_decode<Ints>("08 ff ff ff ff ff ff ff ff ff ff 01", false);
 
         // fixed32, fixed64 and length-delimited values cut short
-        check_decode("3d 01 02", false);
-        check_decode("41 01 02 03", false);
-        check_decode("72 05 aa", false);
+        check_decode<Ints>("3d 01 02", false);
+        check_decode<Ints>("41 01 02 03", false);
+        check_decode<Ints>("72 05 aa", false);
 
         // field number 0
-        check_decode("00 01", false);
+        check_decode<Ints>("00 01", false);
 
         // wire types 3, 4, 6 and 7, on field 13
-        check_decode("6b", false);
-        check_decode("6c", false);
-        check_decode("6e", false);
-        check_decode("6f", false);
+        check_decode<Ints>("6b", false);
+        check_decode<Ints>("6c", false);
+        check_decode<Ints>("6e", false);
+        check_decode<Ints>("6f", false);
 
         // a tag wider than 32 bits
-        check_decode("80 80 80 80 80 01 01", false);
+        check_decode<Ints>("80 80 80 80 80 01 01", false);
     }
 }
 

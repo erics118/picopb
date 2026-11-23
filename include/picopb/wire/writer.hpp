@@ -1,9 +1,11 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <picopb/primitives.hpp>
-#include <picopb/wire_format.hpp>
+#include <cstring>
+#include <picopb/types/numbers.hpp>
+#include <picopb/wire/wire_type.hpp>
 #include <span>
 
 namespace ppb {
@@ -44,6 +46,30 @@ class Writer {
         out_[size_++] = b;
     }
 
+    // copies bytes in bulk; a part that doesn't fit is dropped and sets overflowed()
+    template <class Byte>
+    constexpr void put_bytes(std::span<const Byte> bytes) {
+        const std::size_t fits = std::min(bytes.size(), out_.size() - size_);
+
+        // memcpy can't run at compile time, and the optimizer doesn't always turn the loop into it
+        // fits > 0 keeps a null data() from an empty span out of memcpy
+        if consteval {
+            std::ranges::transform(bytes.first(fits), out_.subspan(size_).begin(), [](Byte b) {
+                return static_cast<std::byte>(b);
+            });
+        } else {
+            if (fits > 0) {
+                std::memcpy(out_.subspan(size_).data(), bytes.data(), fits);
+            }
+        }
+
+        size_ += fits;
+
+        if (fits < bytes.size()) {
+            overflowed_ = true;
+        }
+    }
+
     std::span<std::byte> out_;
     std::size_t size_ = 0;
     bool overflowed_ = false;
@@ -57,15 +83,10 @@ class Writer {
     // whether a byte didn't fit and was dropped; filling the buffer exactly doesn't count
     [[nodiscard]] constexpr bool overflowed() const { return overflowed_; }
 
-    // writes a field and value
-    // if the field has implicit presence, a 0 is skipped
+    // writes a field and value, even a 0; skipping a 0 is the field's job
     template <Primitive S>
     constexpr void write(std::uint32_t field_number, cpp_type_t<S> value) {
         const std::uint64_t bits = S::to_bits(value);
-
-        if (bits == 0) {
-            return;
-        }
 
         write_tag(field_number, S::wire);
 
@@ -74,6 +95,15 @@ class Writer {
         } else {
             write_little_endian(bits, fixed_size(S::wire));
         }
+    }
+
+    // writes a length-delimited field: its tag, the length, then the bytes
+    template <class Byte>
+        requires(sizeof(Byte) == 1)
+    constexpr void write_bytes(std::uint32_t field_number, std::span<const Byte> bytes) {
+        write_tag(field_number, WireType::Len);
+        write_varint(bytes.size());
+        put_bytes(bytes);
     }
 };
 

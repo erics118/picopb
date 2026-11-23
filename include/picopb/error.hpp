@@ -17,6 +17,12 @@ enum class Error : std::uint8_t {
 
     // tag doesn't fit in 32 bits, has field number 0, or has wire type other than the ones defined
     InvalidTag,
+
+    // a string or bytes value is longer than its container's max_size()
+    CapacityExceeded,
+
+    // a string field isn't valid utf-8, which proto3 requires
+    InvalidUtf8,
 };
 
 }  // namespace ppb

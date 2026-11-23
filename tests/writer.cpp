@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <array>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -58,47 +59,62 @@ void check(std::string_view text, std::invocable<ppb::Writer&> auto write) {
     CHECK(test_util::hex(std::span(again).first(*size)) == test_util::hex(expected));
 }
 
-// runs check for each value of primitive type S, with the text built from the field's name
-template <ppb::Primitive S>
-void check_field(std::string_view name, std::uint32_t field_number,
-                 std::initializer_list<ppb::cpp_type_t<S>> values) {
+// runs check for each value of one Ints field, written by its table entry
+// the entry skips a 0, so the 0 cases check implicit presence
+template <std::uint32_t N, auto Member, ppb::Primitive S>
+void check_field(std::string_view name, std::initializer_list<ppb::cpp_type_t<S>> values) {
     for (ppb::cpp_type_t<S> value : values) {
+        Ints message{};
+        message.*Member = value;
+
         check(std::format("{}: {}", name, value), [&](ppb::Writer& w) {
-            w.write<S>(field_number, value);
+            ppb::Field<N, Member, S>::write(w, message);
         });
     }
+}
+
+// std::format can't print an enum by name, and the text format names enum values
+void check_color(std::string_view text, Color color) {
+    check(text, [&](ppb::Writer& w) {
+        ppb::Field<12, &Ints::color, ppb::Enum<Color>>::write(w, Ints{.color = color});
+    });
 }
 
 }  // namespace
 
 TEST_CASE("each field type matches libprotobuf, overflows shorter buffers, and decodes back") {
-    check_field<ppb::Int32>("i32", 1,
-                            {0, 1, -1, 127, 128, test_util::int32_min, test_util::int32_max});
-    check_field<ppb::Int64>("i64", 2,
-                            {0, 1, -1, 127, 128, test_util::int64_min, test_util::int64_max});
-    check_field<ppb::Uint32>("u32", 3, {0, 1, 127, 128, test_util::uint32_max});
-    check_field<ppb::Uint64>("u64", 4, {0, 1, 127, 128, test_util::uint64_max});
+    check_field<1, &Ints::i32, ppb::Int32>(
+        "i32", {0, 1, -1, 127, 128, test_util::int32_min, test_util::int32_max});
+    check_field<2, &Ints::i64, ppb::Int64>(
+        "i64", {0, 1, -1, 127, 128, test_util::int64_min, test_util::int64_max});
+    check_field<3, &Ints::u32, ppb::Uint32>("u32", {0, 1, 127, 128, test_util::uint32_max});
+    check_field<4, &Ints::u64, ppb::Uint64>("u64", {0, 1, 127, 128, test_util::uint64_max});
 
     // zigzag puts the varint's growth from 1 byte to 2 between 63 and 64, and -64 and -65
-    check_field<ppb::Sint32>(
-        "s32", 5, {0, 1, -1, 63, 64, -64, -65, test_util::int32_min, test_util::int32_max});
-    check_field<ppb::Sint64>(
-        "s64", 6, {0, 1, -1, 63, 64, -64, -65, test_util::int64_min, test_util::int64_max});
+    check_field<5, &Ints::s32, ppb::Sint32>(
+        "s32", {0, 1, -1, 63, 64, -64, -65, test_util::int32_min, test_util::int32_max});
+    check_field<6, &Ints::s64, ppb::Sint64>(
+        "s64", {0, 1, -1, 63, 64, -64, -65, test_util::int64_min, test_util::int64_max});
 
-    check_field<ppb::Fixed32>("fx32", 7, {0, 1, test_util::uint32_max});
-    check_field<ppb::Fixed64>("fx64", 8, {0, 1, test_util::uint64_max});
-    check_field<ppb::Sfixed32>("sfx32", 9, {0, 1, -1, test_util::int32_min, test_util::int32_max});
-    check_field<ppb::Sfixed64>("sfx64", 10, {0, 1, -1, test_util::int64_min, test_util::int64_max});
-    check_field<ppb::Bool>("b", 11, {false, true});
+    check_field<7, &Ints::fx32, ppb::Fixed32>("fx32", {0, 1, test_util::uint32_max});
+    check_field<8, &Ints::fx64, ppb::Fixed64>("fx64", {0, 1, test_util::uint64_max});
+    check_field<9, &Ints::sfx32, ppb::Sfixed32>(
+        "sfx32", {0, 1, -1, test_util::int32_min, test_util::int32_max});
+    check_field<10, &Ints::sfx64, ppb::Sfixed64>(
+        "sfx64", {0, 1, -1, test_util::int64_min, test_util::int64_max});
+    check_field<11, &Ints::b, ppb::Bool>("b", {false, true});
 
-    // std::format can't print an enum by name, and the text format names enum values
-    check("color: COLOR_UNSPECIFIED", [](ppb::Writer& w) {
-        w.write<ppb::Enum<Color>>(12, Color::COLOR_UNSPECIFIED);
-    });
-    check("color: RED", [](ppb::Writer& w) {
-        w.write<ppb::Enum<Color>>(12, Color::RED);
-    });
-    check("color: NEGATIVE", [](ppb::Writer& w) {
-        w.write<ppb::Enum<Color>>(12, Color::NEGATIVE);
-    });
+    check_color("color: COLOR_UNSPECIFIED", Color::COLOR_UNSPECIFIED);
+    check_color("color: RED", Color::RED);
+    check_color("color: NEGATIVE", Color::NEGATIVE);
+}
+
+TEST_CASE("Writer::write writes a 0, since skipping it is the field's job") {
+    std::array<std::byte, 2> buffer{};
+    ppb::Writer w{buffer};
+
+    w.write<ppb::Int32>(1, 0);
+
+    CHECK_FALSE(w.overflowed());
+    CHECK(test_util::hex(std::span(buffer).first(w.size())) == "08 00");
 }

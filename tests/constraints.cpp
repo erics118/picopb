@@ -1,9 +1,15 @@
 // the compile-time rules picopb's concepts and constraints enforce
 // each static_assert fails the build if an edit loosens or breaks a rule
 
+#include <array>
+#include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <picopb/picopb.hpp>
+#include <string>
+#include <string_view>
 #include <tuple>
+#include <vector>
 
 namespace {
 
@@ -47,6 +53,10 @@ struct Wire3 {
     static constexpr cpp_type from_bits(std::uint64_t /*bits*/) { return 0; }
 };
 
+// whether t.view() compiles, as a concept so a missing or private view() fails softly
+template <class T>
+concept HasView = requires(const T& t) { t.view(); };
+
 // every built-in trait is a Primitive, and these aren't
 static_assert(ppb::Primitive<ppb::Int32>);
 static_assert(ppb::Primitive<ppb::Int64>);
@@ -74,15 +84,54 @@ static_assert(EnumAccepted<Color>);
 static_assert(!EnumAccepted<Small>);
 static_assert(!EnumAccepted<std::int32_t>);
 
+// a bytes field's container: resizable, contiguous one-byte elements
+static_assert(ppb::BytesContainer<std::string>);
+static_assert(ppb::BytesContainer<std::vector<std::byte>>);
+static_assert(ppb::BytesContainer<ppb::InplaceString<8>>);
+static_assert(ppb::BytesContainer<ppb::InplaceBytes<8>>);
+static_assert(!ppb::BytesContainer<std::array<char, 8>>);
+static_assert(!ppb::BytesContainer<std::string_view>);
+static_assert(!ppb::BytesContainer<std::vector<std::int32_t>>);
+
+// a string field's container: the same, with char elements
+static_assert(ppb::StringContainer<std::string>);
+static_assert(ppb::StringContainer<ppb::InplaceString<8>>);
+static_assert(!ppb::StringContainer<ppb::InplaceBytes<8>>);
+static_assert(!ppb::StringContainer<std::string_view>);
+
+// text can't be passed or bound as a vector of chars
+static_assert(!std::convertible_to<ppb::InplaceString<8>&, ppb::InplaceVector<char, 8>&>);
+static_assert(!std::convertible_to<ppb::InplaceString<8>, ppb::InplaceVector<char, 8>>);
+
+// text becomes a std::string_view by conversion, as std::string does, with no view() member
+static_assert(std::convertible_to<const ppb::InplaceString<8>&, std::string_view>);
+static_assert(!HasView<ppb::InplaceString<8>>);
+
+// a string needs char elements, while bytes also take unsigned char and std::byte
+static_assert(ppb::String::stores<std::string>);
+static_assert(ppb::String::stores<ppb::InplaceString<8>>);
+static_assert(!ppb::String::stores<std::vector<std::byte>>);
+static_assert(ppb::Bytes::stores<std::string>);
+static_assert(ppb::Bytes::stores<std::vector<unsigned char>>);
+static_assert(ppb::Bytes::stores<ppb::InplaceBytes<8>>);
+static_assert(!ppb::Bytes::stores<std::vector<std::int32_t>>);
+
+// strings and bytes aren't primitives, which are one number on the wire
+static_assert(!ppb::Primitive<ppb::String>);
+static_assert(!ppb::Primitive<ppb::Bytes>);
+
 struct M {
     std::int32_t i32 = 0;
     std::uint32_t u32 = 0;
     std::int64_t i64 = 0;
+    std::string text;
+    ppb::InplaceString<8> inplace_text;
+    std::vector<std::byte> data;
 
     [[nodiscard]] std::int32_t get() const { return i32; }
 };
 
-// Field takes only a pointer to a data member whose type is the primitive type's C++ type
+// Field takes only a pointer to a data member that can hold its proto type
 template <auto Member, class S>
 concept FieldAccepted = requires { typename ppb::Field<1, Member, S>; };
 
@@ -95,6 +144,13 @@ static_assert(!FieldAccepted<&M::i32, ppb::Bool>);
 static_assert(!FieldAccepted<std::int32_t{42}, ppb::Int32>);
 static_assert(!FieldAccepted<nullptr, ppb::Int32>);
 static_assert(!FieldAccepted<&M::get, ppb::Int32>);
+static_assert(FieldAccepted<&M::text, ppb::String>);
+static_assert(FieldAccepted<&M::inplace_text, ppb::String>);
+static_assert(FieldAccepted<&M::data, ppb::Bytes>);
+static_assert(FieldAccepted<&M::text, ppb::Bytes>);
+static_assert(!FieldAccepted<&M::data, ppb::String>);
+static_assert(!FieldAccepted<&M::i32, ppb::String>);
+static_assert(!FieldAccepted<&M::text, ppb::Int32>);
 
 struct Good {
     std::int32_t i32 = 0;

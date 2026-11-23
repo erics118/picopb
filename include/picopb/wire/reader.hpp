@@ -5,8 +5,8 @@
 #include <expected>
 #include <limits>
 #include <picopb/error.hpp>
-#include <picopb/primitives.hpp>
-#include <picopb/wire_format.hpp>
+#include <picopb/types/numbers.hpp>
+#include <picopb/wire/wire_type.hpp>
 #include <span>
 
 namespace ppb {
@@ -140,6 +140,30 @@ class Reader {
         }
 
         value = S::from_bits(*bits);
+
+        return true;
+    }
+
+    // reads a length-delimited value and points bytes at it, inside the input
+    // false means the field has another wire type, so the caller skips it like an unknown field
+    [[nodiscard]] constexpr std::expected<bool, Error> read_bytes(
+        WireType wire, std::span<const std::byte>& bytes) {
+        if (wire != WireType::Len) {
+            return false;
+        }
+
+        const auto length = read_varint();
+
+        if (!length) {
+            return std::unexpected(length.error());
+        }
+
+        if (*length > in_.size() - pos_) {
+            return std::unexpected(Error::Truncated);
+        }
+
+        bytes = in_.subspan(pos_, static_cast<std::size_t>(*length));
+        pos_ += bytes.size();
 
         return true;
     }

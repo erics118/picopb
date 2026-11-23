@@ -3,22 +3,20 @@
 #include <concepts>
 #include <cstddef>
 #include <expected>
-#include <picopb/error.hpp>        // IWYU pragma: export
-#include <picopb/field.hpp>        // IWYU pragma: export
-#include <picopb/primitives.hpp>   // IWYU pragma: export
-#include <picopb/reader.hpp>       // IWYU pragma: export
-#include <picopb/wire_format.hpp>  // IWYU pragma: export
-#include <picopb/writer.hpp>       // IWYU pragma: export
+#include <picopb/containers/inplace_string.hpp>  // IWYU pragma: export
+#include <picopb/containers/inplace_vector.hpp>  // IWYU pragma: export
+#include <picopb/error.hpp>                      // IWYU pragma: export
+#include <picopb/message.hpp>                    // IWYU pragma: export
+#include <picopb/types/numbers.hpp>              // IWYU pragma: export
+#include <picopb/types/strings.hpp>              // IWYU pragma: export
+#include <picopb/utf8.hpp>                       // IWYU pragma: export
+#include <picopb/wire/reader.hpp>                // IWYU pragma: export
+#include <picopb/wire/wire_type.hpp>             // IWYU pragma: export
+#include <picopb/wire/writer.hpp>                // IWYU pragma: export
 #include <span>
 #include <tuple>
 
 namespace ppb {
-
-// a generated message
-// ensures that _fields is actually a fields table
-template <class M>
-concept Message =
-    std::default_initializable<M> && requires { requires detail::is_field_table<M>(M::_fields); };
 
 namespace detail {
 
@@ -27,9 +25,7 @@ template <Message M>
 constexpr void write_fields(const M& message, Writer& w) {
     std::apply(
         [&](auto... field) {
-            (w.write<typename decltype(field)::primitive>(decltype(field)::number,
-                                                          message.*decltype(field)::member),
-             ...);
+            (decltype(field)::write(w, message), ...);
         },
         M::_fields);
 }
@@ -44,9 +40,7 @@ constexpr std::expected<bool, Error> read_field(M& message, Reader& r, Tag tag) 
         [&](auto... field) {
             // || stops at the first field whose number matches, so at most one member is read
             (void)((tag.field_number == decltype(field)::number &&
-                    (result = r.read<typename decltype(field)::primitive>(
-                         tag.wire, message.*decltype(field)::member),
-                     true)) ||
+                    (result = decltype(field)::read(r, tag.wire, message), true)) ||
                    ...);
         },
         M::_fields);

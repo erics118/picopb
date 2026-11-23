@@ -2,7 +2,7 @@
 
 #include <concepts>
 #include <cstdint>
-#include <picopb/wire_format.hpp>
+#include <picopb/wire/wire_type.hpp>
 #include <type_traits>
 #include <utility>
 
