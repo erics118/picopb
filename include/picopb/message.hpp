@@ -49,7 +49,7 @@ struct Field {
     // writes this field of message
     // a 0 or an empty string isn't written, since the field has implicit presence
     template <class M>
-    static constexpr void write(Writer& w, const M& message) {
+    static constexpr void write(detail::Writer& w, const M& message) {
         const auto& value = message.*Member;
 
         if constexpr (Primitive<T>) {
@@ -66,7 +66,8 @@ struct Field {
     // reads this field of message
     // false means the field arrived with another wire type, so caller skips it
     template <class M>
-    [[nodiscard]] static constexpr std::expected<bool, Error> read(Reader& r, WireType wire,
+    [[nodiscard]] static constexpr std::expected<bool, Error> read(detail::Reader& r,
+                                                                   detail::WireType wire,
                                                                    M& message) {
         auto& value = message.*Member;
 
@@ -85,7 +86,7 @@ struct Field {
             }
 
             if constexpr (T::validates_utf8) {
-                if (!is_valid_utf8(bytes)) {
+                if (!detail::is_valid_utf8(bytes)) {
                     return std::unexpected(Error::InvalidUtf8);
                 }
             }

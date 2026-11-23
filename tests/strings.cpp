@@ -8,7 +8,6 @@
 #include <picopb/picopb.hpp>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <vector>
 
 #include "compare.hpp"

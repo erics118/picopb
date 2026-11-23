@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace ppb {
+namespace ppb::detail {
 
 // wire type determines how a field's value is encoded
 // stored in the lowest 3 bits of the tag
@@ -61,4 +61,4 @@ struct Tag {
     WireType wire;
 };
 
-}  // namespace ppb
+}  // namespace ppb::detail

@@ -8,7 +8,7 @@
 #include <picopb/wire/wire_type.hpp>
 #include <span>
 
-namespace ppb {
+namespace ppb::detail {
 
 // writes wire format bytes into a caller's buffer
 // a byte that doesn't fit is dropped and sets overflowed(), and the output is then incomplete
@@ -19,21 +19,6 @@ class Writer {
             put(static_cast<std::byte>(value & 0xff));
             value >>= 8;
         }
-    }
-
-    constexpr void write_varint(std::uint64_t value) {
-        // the rest doesn't fit in 7 bits, so set the continuation bit
-        while (value >= 0x80) {
-            put(static_cast<std::byte>((value & 0x7f) | 0x80));
-            value >>= 7;
-        }
-
-        put(static_cast<std::byte>(value));
-    }
-
-    constexpr void write_tag(std::uint32_t field_number, WireType wire) {
-        write_varint((static_cast<std::uint64_t>(field_number) << 3) |
-                     static_cast<std::uint8_t>(wire));
     }
 
     constexpr void put(std::byte b) {
@@ -83,6 +68,35 @@ class Writer {
     // whether a byte didn't fit and was dropped; filling the buffer exactly doesn't count
     [[nodiscard]] constexpr bool overflowed() const { return overflowed_; }
 
+    constexpr void write_varint(std::uint64_t value) {
+        // the rest doesn't fit in 7 bits, so set the continuation bit
+        while (value >= 0x80) {
+            put(static_cast<std::byte>((value & 0x7f) | 0x80));
+            value >>= 7;
+        }
+
+        put(static_cast<std::byte>(value));
+    }
+
+    constexpr void write_tag(std::uint32_t field_number, WireType wire) {
+        write_varint((static_cast<std::uint64_t>(field_number) << 3) |
+                     static_cast<std::uint8_t>(wire));
+    }
+
+    // 4 bytes, little-endian
+    constexpr void write_i32(std::uint32_t value) { write_little_endian(value, 4); }
+
+    // 8 bytes, little-endian
+    constexpr void write_i64(std::uint64_t value) { write_little_endian(value, 8); }
+
+    // a length-delimited value: the length as a varint, then the bytes
+    template <class Byte>
+        requires(sizeof(Byte) == 1)
+    constexpr void write_len(std::span<const Byte> bytes) {
+        write_varint(bytes.size());
+        put_bytes(bytes);
+    }
+
     // writes a field and value, even a 0; skipping a 0 is the field's job
     template <Primitive S>
     constexpr void write(std::uint32_t field_number, cpp_type_t<S> value) {
@@ -107,4 +121,4 @@ class Writer {
     }
 };
 
-}  // namespace ppb
+}  // namespace ppb::detail

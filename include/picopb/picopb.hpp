@@ -54,7 +54,7 @@ constexpr std::expected<bool, Error> read_field(M& message, Reader& r, Tag tag) 
 template <Message M>
 [[nodiscard]] constexpr std::expected<std::size_t, Error> encode(const M& message,
                                                                  std::span<std::byte> buffer) {
-    Writer w{buffer};
+    detail::Writer w{buffer};
 
     detail::write_fields(message, w);
 
@@ -71,7 +71,7 @@ template <Message M>
 template <Message M>
 [[nodiscard]] constexpr std::expected<M, Error> decode(std::span<const std::byte> bytes) {
     M message{};
-    Reader r{bytes};
+    detail::Reader r{bytes};
 
     while (!r.done()) {
         const auto tag = r.read_tag();

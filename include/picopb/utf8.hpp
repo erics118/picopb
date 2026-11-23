@@ -6,9 +6,7 @@
 #include <span>
 #include <string_view>
 
-namespace ppb {
-
-namespace detail {
+namespace ppb::detail {
 
 // if the 8 bytes at std::text[i] is ascii
 // because most text is just ascii, so this makes the check faster
@@ -43,15 +41,13 @@ constexpr std::size_t utf8_prefix(std::string_view text, std::size_t max) {
     return size;
 }
 
-}  // namespace detail
-
 // if is valid utf-8, which protobuf requires for string fields
 // rejects overlong forms, utf-16 surrogates, and code points above U+10FFFF
 constexpr bool is_valid_utf8(std::span<const std::byte> text) {
     std::size_t i = 0;
 
     while (i < text.size()) {
-        if (detail::ascii8(text, i)) {
+        if (ascii8(text, i)) {
             i += 8;
             continue;
         }
@@ -95,7 +91,7 @@ constexpr bool is_valid_utf8(std::span<const std::byte> text) {
             const auto next = std::to_integer<std::uint32_t>(text[i + k]);
 
             // every byte after the lead must be 10xxxxxx
-            if (!detail::is_continuation(next)) {
+            if (!is_continuation(next)) {
                 return false;
             }
 
@@ -113,4 +109,4 @@ constexpr bool is_valid_utf8(std::span<const std::byte> text) {
     return true;
 }
 
-}  // namespace ppb
+}  // namespace ppb::detail

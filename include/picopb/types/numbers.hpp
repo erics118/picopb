@@ -16,14 +16,14 @@ using cpp_type_t = S::cpp_type;
 // has a function defining how to convert to and from its wire format
 template <class S>
 concept Primitive = requires(cpp_type_t<S> value, std::uint64_t bits) {
-    requires S::wire == WireType::Varint || fixed_size(S::wire) != 0;
+    requires S::wire == detail::WireType::Varint || detail::fixed_size(S::wire) != 0;
     { S::to_bits(value) } -> std::same_as<std::uint64_t>;
     { S::from_bits(bits) } -> std::same_as<cpp_type_t<S>>;
 };
 
 struct Int32 {
     using cpp_type = std::int32_t;
-    static constexpr WireType wire = WireType::Varint;
+    static constexpr detail::WireType wire = detail::WireType::Varint;
 
     // negative value is widened to 64 bits in two's complement
     static constexpr std::uint64_t to_bits(cpp_type value) {
@@ -36,7 +36,7 @@ struct Int32 {
 
 struct Int64 {
     using cpp_type = std::int64_t;
-    static constexpr WireType wire = WireType::Varint;
+    static constexpr detail::WireType wire = detail::WireType::Varint;
 
     static constexpr std::uint64_t to_bits(cpp_type value) {
         return static_cast<std::uint64_t>(value);
@@ -47,7 +47,7 @@ struct Int64 {
 
 struct Uint32 {
     using cpp_type = std::uint32_t;
-    static constexpr WireType wire = WireType::Varint;
+    static constexpr detail::WireType wire = detail::WireType::Varint;
 
     static constexpr std::uint64_t to_bits(cpp_type value) { return value; }
 
@@ -56,7 +56,7 @@ struct Uint32 {
 
 struct Uint64 {
     using cpp_type = std::uint64_t;
-    static constexpr WireType wire = WireType::Varint;
+    static constexpr detail::WireType wire = detail::WireType::Varint;
 
     static constexpr std::uint64_t to_bits(cpp_type value) { return value; }
 
@@ -67,7 +67,7 @@ struct Uint64 {
 // n >= 0 gets turned into 2n; n < 0 becomes -2n-1
 struct Sint32 {
     using cpp_type = std::int32_t;
-    static constexpr WireType wire = WireType::Varint;
+    static constexpr detail::WireType wire = detail::WireType::Varint;
 
     static constexpr std::uint64_t to_bits(cpp_type value) {
         return (static_cast<std::uint32_t>(value) << 1) ^ static_cast<std::uint32_t>(value >> 31);
@@ -82,7 +82,7 @@ struct Sint32 {
 
 struct Sint64 {
     using cpp_type = std::int64_t;
-    static constexpr WireType wire = WireType::Varint;
+    static constexpr detail::WireType wire = detail::WireType::Varint;
 
     static constexpr std::uint64_t to_bits(cpp_type value) {
         return (static_cast<std::uint64_t>(value) << 1) ^ static_cast<std::uint64_t>(value >> 63);
@@ -95,7 +95,7 @@ struct Sint64 {
 
 struct Fixed32 {
     using cpp_type = std::uint32_t;
-    static constexpr WireType wire = WireType::I32;
+    static constexpr detail::WireType wire = detail::WireType::I32;
 
     static constexpr std::uint64_t to_bits(cpp_type value) { return value; }
 
@@ -104,7 +104,7 @@ struct Fixed32 {
 
 struct Fixed64 {
     using cpp_type = std::uint64_t;
-    static constexpr WireType wire = WireType::I64;
+    static constexpr detail::WireType wire = detail::WireType::I64;
 
     static constexpr std::uint64_t to_bits(cpp_type value) { return value; }
 
@@ -114,7 +114,7 @@ struct Fixed64 {
 // sfixed32 and sfixed64 write the value's bits unchanged, with no zigzag or widening
 struct Sfixed32 {
     using cpp_type = std::int32_t;
-    static constexpr WireType wire = WireType::I32;
+    static constexpr detail::WireType wire = detail::WireType::I32;
 
     static constexpr std::uint64_t to_bits(cpp_type value) {
         return static_cast<std::uint32_t>(value);
@@ -125,7 +125,7 @@ struct Sfixed32 {
 
 struct Sfixed64 {
     using cpp_type = std::int64_t;
-    static constexpr WireType wire = WireType::I64;
+    static constexpr detail::WireType wire = detail::WireType::I64;
 
     static constexpr std::uint64_t to_bits(cpp_type value) {
         return static_cast<std::uint64_t>(value);
@@ -136,7 +136,7 @@ struct Sfixed64 {
 
 struct Bool {
     using cpp_type = bool;
-    static constexpr WireType wire = WireType::Varint;
+    static constexpr detail::WireType wire = detail::WireType::Varint;
 
     static constexpr std::uint64_t to_bits(cpp_type value) { return value ? 1U : 0U; }
 
@@ -151,7 +151,7 @@ template <class E>
     requires std::is_enum_v<E> && std::is_same_v<std::underlying_type_t<E>, std::int32_t>
 struct Enum {
     using cpp_type = E;
-    static constexpr WireType wire = WireType::Varint;
+    static constexpr detail::WireType wire = detail::WireType::Varint;
 
     static constexpr std::uint64_t to_bits(cpp_type value) {
         return Int32::to_bits(std::to_underlying(value));

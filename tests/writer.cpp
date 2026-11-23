@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <array>
 #include <concepts>
 #include <cstddef>
@@ -21,7 +22,7 @@ using picopb::test_messages::ints::Color;
 using picopb::test_messages::ints::Ints;
 
 // checks one field of Ints against libprotobuf
-void check(std::string_view text, std::invocable<ppb::Writer&> auto write) {
+void check(std::string_view text, std::invocable<ppb::detail::Writer&> auto write) {
     INFO(text);
 
     // the expected result
@@ -30,7 +31,7 @@ void check(std::string_view text, std::invocable<ppb::Writer&> auto write) {
     // ensure that all sizes smaller than it does overflow
     for (std::size_t size = 0; size < expected.size(); ++size) {
         std::vector<std::byte> buffer(size);
-        ppb::Writer w{buffer};
+        ppb::detail::Writer w{buffer};
 
         write(w);
 
@@ -40,7 +41,7 @@ void check(std::string_view text, std::invocable<ppb::Writer&> auto write) {
 
     // alloc a buf with proper size, and it should not overflow and should be exactly equal
     std::vector<std::byte> buffer(expected.size());
-    ppb::Writer w{buffer};
+    ppb::detail::Writer w{buffer};
 
     write(w);
 
@@ -67,7 +68,7 @@ void check_field(std::string_view name, std::initializer_list<ppb::cpp_type_t<S>
         Ints message{};
         message.*Member = value;
 
-        check(std::format("{}: {}", name, value), [&](ppb::Writer& w) {
+        check(std::format("{}: {}", name, value), [&](ppb::detail::Writer& w) {
             ppb::Field<N, Member, S>::write(w, message);
         });
     }
@@ -75,7 +76,7 @@ void check_field(std::string_view name, std::initializer_list<ppb::cpp_type_t<S>
 
 // std::format can't print an enum by name, and the text format names enum values
 void check_color(std::string_view text, Color color) {
-    check(text, [&](ppb::Writer& w) {
+    check(text, [&](ppb::detail::Writer& w) {
         ppb::Field<12, &Ints::color, ppb::Enum<Color>>::write(w, Ints{.color = color});
     });
 }
@@ -111,10 +112,53 @@ TEST_CASE("each field type matches libprotobuf, overflows shorter buffers, and d
 
 TEST_CASE("Writer::write writes a 0, since skipping it is the field's job") {
     std::array<std::byte, 2> buffer{};
-    ppb::Writer w{buffer};
+    ppb::detail::Writer w{buffer};
 
     w.write<ppb::Int32>(1, 0);
 
     CHECK_FALSE(w.overflowed());
     CHECK(test_util::hex(std::span(buffer).first(w.size())) == "08 00");
+}
+
+TEST_CASE("Writer writes each wire value, and Reader reads it back") {
+    std::array<std::byte, 32> buffer{};
+    ppb::detail::Writer w{buffer};
+    const std::array payload{std::byte{0x61}, std::byte{0x62}};
+
+    w.write_tag(1, ppb::detail::WireType::Varint);
+    w.write_varint(300);
+    w.write_tag(2, ppb::detail::WireType::I32);
+    w.write_i32(0x01020304);
+    w.write_tag(3, ppb::detail::WireType::I64);
+    w.write_i64(0x0102030405060708);
+    w.write_tag(4, ppb::detail::WireType::Len);
+    w.write_len(std::span<const std::byte>(payload));
+
+    REQUIRE_FALSE(w.overflowed());
+    CHECK(test_util::hex(std::span(buffer).first(w.size())) ==
+          "08 ac 02 15 04 03 02 01 19 08 07 06 05 04 03 02 01 22 02 61 62");
+
+    ppb::detail::Reader r{std::span<const std::byte>(buffer).first(w.size())};
+
+    CHECK(r.read_tag()->wire == ppb::detail::WireType::Varint);
+    CHECK(r.read_varint() == 300U);
+    CHECK(r.read_tag()->wire == ppb::detail::WireType::I32);
+    CHECK(r.read_i32() == 0x01020304U);
+    CHECK(r.read_tag()->wire == ppb::detail::WireType::I64);
+    CHECK(r.read_i64() == 0x0102030405060708U);
+    CHECK(r.read_tag()->field_number == 4);
+
+    const auto bytes = r.read_len();
+
+    REQUIRE(bytes.has_value());
+    CHECK(std::ranges::equal(*bytes, payload));
+    CHECK(r.done());
+}
+
+TEST_CASE("Reader reports a wire value cut off by the end of input") {
+    const std::vector<std::byte> i32 = test_util::from_hex("04 03");
+    const std::vector<std::byte> len = test_util::from_hex("05 61");
+
+    CHECK(ppb::detail::Reader{i32}.read_i32().error() == ppb::Error::Truncated);
+    CHECK(ppb::detail::Reader{len}.read_len().error() == ppb::Error::Truncated);
 }

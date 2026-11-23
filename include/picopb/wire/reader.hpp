@@ -9,7 +9,7 @@
 #include <picopb/wire/wire_type.hpp>
 #include <span>
 
-namespace ppb {
+namespace ppb::detail {
 
 // reads bytes
 class Reader {
@@ -38,7 +38,16 @@ class Reader {
         return {};
     }
 
-    constexpr std::expected<std::uint64_t, Error> read_varint() {
+    std::span<const std::byte> in_;
+    std::size_t pos_ = 0;
+
+   public:
+    constexpr explicit Reader(std::span<const std::byte> in) : in_(in) {}
+
+    // whether every byte has been read
+    [[nodiscard]] constexpr bool done() const { return pos_ == in_.size(); }
+
+    [[nodiscard]] constexpr std::expected<std::uint64_t, Error> read_varint() {
         std::uint64_t value = 0;
 
         // 10 bytes of 7 bits each cover all 64 bits
@@ -60,14 +69,39 @@ class Reader {
         return std::unexpected(Error::InvalidVarint);
     }
 
-    std::span<const std::byte> in_;
-    std::size_t pos_ = 0;
+    // 4 bytes, little-endian
+    [[nodiscard]] constexpr std::expected<std::uint32_t, Error> read_i32() {
+        const auto bits = read_little_endian(4);
 
-   public:
-    constexpr explicit Reader(std::span<const std::byte> in) : in_(in) {}
+        if (!bits) {
+            return std::unexpected(bits.error());
+        }
 
-    // whether every byte has been read
-    [[nodiscard]] constexpr bool done() const { return pos_ == in_.size(); }
+        return static_cast<std::uint32_t>(*bits);
+    }
+
+    // 8 bytes, little-endian
+    [[nodiscard]] constexpr std::expected<std::uint64_t, Error> read_i64() {
+        return read_little_endian(8);
+    }
+
+    // a length-delimited value, as bytes inside the input
+    [[nodiscard]] constexpr std::expected<std::span<const std::byte>, Error> read_len() {
+        const auto length = read_varint();
+
+        if (!length) {
+            return std::unexpected(length.error());
+        }
+
+        if (*length > in_.size() - pos_) {
+            return std::unexpected(Error::Truncated);
+        }
+
+        const auto bytes = in_.subspan(pos_, static_cast<std::size_t>(*length));
+        pos_ += bytes.size();
+
+        return bytes;
+    }
 
     [[nodiscard]] constexpr std::expected<Tag, Error> read_tag() {
         const auto bits = read_varint();
@@ -169,4 +203,4 @@ class Reader {
     }
 };
 
-}  // namespace ppb
+}  // namespace ppb::detail

@@ -19,26 +19,25 @@ concept ByteContainer =
         container.assign_range(range);
     };
 
-}  // namespace detail
-
 // a container to store a protobuf string
 // eg: std::string or ppb::InplaceString<N>
 template <class C>
-concept StringContainer =
-    detail::ByteContainer<C> && std::same_as<std::ranges::range_value_t<C>, char>;
+concept StringContainer = ByteContainer<C> && std::same_as<std::ranges::range_value_t<C>, char>;
 
 // a container to store a protobuf bytes
 // eg: std::vector<std::byte>, std::string or ppb::InplaceBytes<N>
 template <class C>
 concept BytesContainer =
-    detail::ByteContainer<C> && (std::same_as<std::ranges::range_value_t<C>, char> ||
-                                 std::same_as<std::ranges::range_value_t<C>, unsigned char> ||
-                                 std::same_as<std::ranges::range_value_t<C>, std::byte>);
+    ByteContainer<C> && (std::same_as<std::ranges::range_value_t<C>, char> ||
+                         std::same_as<std::ranges::range_value_t<C>, unsigned char> ||
+                         std::same_as<std::ranges::range_value_t<C>, std::byte>);
+
+}  // namespace detail
 
 // protobuf string type: utf-8 text
 struct String {
     template <class C>
-    static constexpr bool stores = StringContainer<C>;
+    static constexpr bool stores = detail::StringContainer<C>;
 
     static constexpr bool validates_utf8 = true;
 };
@@ -46,7 +45,7 @@ struct String {
 // prptobuf bytes type
 struct Bytes {
     template <class C>
-    static constexpr bool stores = BytesContainer<C>;
+    static constexpr bool stores = detail::BytesContainer<C>;
 
     static constexpr bool validates_utf8 = false;
 };

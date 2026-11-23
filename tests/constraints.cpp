@@ -18,7 +18,7 @@ enum class Small : std::uint8_t { ONE = 1 };
 
 // Primitive fails on the missing cpp_type first, so clang sees wire as never read
 struct NoCppType {
-    [[maybe_unused]] static constexpr ppb::WireType wire = ppb::WireType::Varint;
+    [[maybe_unused]] static constexpr ppb::detail::WireType wire = ppb::detail::WireType::Varint;
 
     static constexpr std::uint64_t to_bits(std::int32_t /*value*/) { return 0; }
 
@@ -27,7 +27,7 @@ struct NoCppType {
 
 struct LenWire {
     using cpp_type = std::int32_t;
-    static constexpr ppb::WireType wire = ppb::WireType::Len;
+    static constexpr ppb::detail::WireType wire = ppb::detail::WireType::Len;
 
     static constexpr std::uint64_t to_bits(cpp_type /*value*/) { return 0; }
 
@@ -36,7 +36,7 @@ struct LenWire {
 
 struct WrongFromBits {
     using cpp_type = std::int32_t;
-    static constexpr ppb::WireType wire = ppb::WireType::Varint;
+    static constexpr ppb::detail::WireType wire = ppb::detail::WireType::Varint;
 
     static constexpr std::uint64_t to_bits(cpp_type /*value*/) { return 0; }
 
@@ -46,7 +46,7 @@ struct WrongFromBits {
 // wire type 3, a deprecated group start, isn't a value
 struct Wire3 {
     using cpp_type = std::int32_t;
-    static constexpr ppb::WireType wire = static_cast<ppb::WireType>(3);
+    static constexpr ppb::detail::WireType wire = static_cast<ppb::detail::WireType>(3);
 
     static constexpr std::uint64_t to_bits(cpp_type /*value*/) { return 0; }
 
@@ -91,20 +91,20 @@ static_assert(!EnumAccepted<Small>);
 static_assert(!EnumAccepted<std::int32_t>);
 
 // a bytes field's container: resizable, contiguous one-byte elements
-static_assert(ppb::BytesContainer<std::string>);
-static_assert(ppb::BytesContainer<std::vector<std::byte>>);
-static_assert(ppb::BytesContainer<ppb::InplaceString<8>>);
-static_assert(ppb::BytesContainer<ppb::InplaceBytes<8>>);
-static_assert(!ppb::BytesContainer<std::array<char, 8>>);
-static_assert(!ppb::BytesContainer<std::string_view>);
-static_assert(!ppb::BytesContainer<std::vector<std::int32_t>>);
-static_assert(!ppb::BytesContainer<NoAssignRange>);
+static_assert(ppb::detail::BytesContainer<std::string>);
+static_assert(ppb::detail::BytesContainer<std::vector<std::byte>>);
+static_assert(ppb::detail::BytesContainer<ppb::InplaceString<8>>);
+static_assert(ppb::detail::BytesContainer<ppb::InplaceBytes<8>>);
+static_assert(!ppb::detail::BytesContainer<std::array<char, 8>>);
+static_assert(!ppb::detail::BytesContainer<std::string_view>);
+static_assert(!ppb::detail::BytesContainer<std::vector<std::int32_t>>);
+static_assert(!ppb::detail::BytesContainer<NoAssignRange>);
 
 // a string field's container: the same, with char elements
-static_assert(ppb::StringContainer<std::string>);
-static_assert(ppb::StringContainer<ppb::InplaceString<8>>);
-static_assert(!ppb::StringContainer<ppb::InplaceBytes<8>>);
-static_assert(!ppb::StringContainer<std::string_view>);
+static_assert(ppb::detail::StringContainer<std::string>);
+static_assert(ppb::detail::StringContainer<ppb::InplaceString<8>>);
+static_assert(!ppb::detail::StringContainer<ppb::InplaceBytes<8>>);
+static_assert(!ppb::detail::StringContainer<std::string_view>);
 
 // text can't be passed or bound as a vector of chars
 static_assert(!std::convertible_to<ppb::InplaceString<8>&, ppb::InplaceVector<char, 8>&>);
