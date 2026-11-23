@@ -17,3 +17,19 @@ sanitize:
     cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DPICOPB_SANITIZE=ON
     cmake --build build-sanitize
     ctest --test-dir build-sanitize --output-on-failure
+
+# compile the encoder and decoder for the rp2040 with exceptions off, at -Os and at -O3
+# (the pico sdk's default), since each level can emit different calls
+# fails if either object calls anything beyond libc's memory routines and gcc's arm helpers
+check-no-heap:
+    mkdir -p build
+    for opt in Os O3; do \
+        arm-none-eabi-g++ -std=c++23 -mcpu=cortex-m0plus -mthumb -$opt -fno-exceptions \
+            -fno-rtti -Wall -Wextra -Werror -Iinclude -c tests/no_heap.cpp \
+            -o build/no_heap-$opt.o && \
+        tools/check-no-heap.sh build/no_heap-$opt.o encode_example && \
+        tools/check-no-heap.sh build/no_heap-$opt.o decode_example || exit 1; \
+    done
+
+# the tests plus the no-heap check
+check: test check-no-heap

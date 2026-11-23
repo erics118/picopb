@@ -33,6 +33,7 @@
               llvm.lldb
               cmake-language-server
               just
+              gcc-arm-embedded
             ];
 
             CMAKE_GENERATOR = "Ninja";
@@ -49,6 +50,8 @@
               ./include
               ./tests
               ./examples
+              ./tools
+              ./justfile
             ];
           };
 
@@ -98,6 +101,21 @@
                 "-DBUILD_TESTING=OFF"
               ];
               installPhase = "install -D picopb-example $out/bin/picopb-example";
+            };
+
+            # fail if the rp2040 encoder or decoder needs the heap or exceptions
+            no-heap = pkgs.stdenvNoCC.mkDerivation {
+              name = "picopb-no-heap";
+              inherit src;
+              nativeBuildInputs = with pkgs; [
+                gcc-arm-embedded
+                just
+              ];
+              buildPhase = ''
+                patchShebangs tools
+                just check-no-heap
+              '';
+              installPhase = "touch $out";
             };
           }
           # gcc for linux only
