@@ -36,24 +36,6 @@ std::string seventeen_bytes() {
     return out;
 }
 
-// a literal fits, and InplaceString works at compile time
-constexpr ppb::InplaceString<8> imu = "imu";
-
-static_assert(imu == std::string_view{"imu"});
-static_assert(imu.size() == 3);
-
-// every way to compare text, in both orders, with no ambiguity
-constexpr const char* imu_pointer = "imu";
-
-static_assert(imu == ppb::InplaceString<8>{"imu"});
-static_assert(imu == ppb::InplaceString<4>{"imu"} && ppb::InplaceString<4>{"imu"} == imu);
-static_assert(imu != ppb::InplaceString<4>{"imx"});
-static_assert(imu == "imu" && "imu" == imu && imu != "imx");
-static_assert(imu != "a literal longer than eight");
-static_assert(imu == imu_pointer && imu_pointer == imu);
-static_assert(std::string_view{"imu"} == imu && imu != std::string_view{"im"});
-static_assert(imu == std::string{"imu"} && std::string{"imu"} == imu);
-
 // a continuation byte is 10xxxxxx
 static_assert(ppb::detail::is_continuation(0x80));
 static_assert(ppb::detail::is_continuation(0xbf));
@@ -171,37 +153,4 @@ TEST_CASE("only the fixed-capacity storage rejects a value longer than its capac
 
     REQUIRE_FALSE(inplace.has_value());
     CHECK(inplace.error() == ppb::Error::CapacityExceeded);
-}
-
-TEST_CASE("InplaceString converts to std::string, and from it by cutting at its capacity") {
-    SUBCASE("to std::string") {
-        const ppb::InplaceString<8> name = "imu";
-        const std::string text(name);
-
-        CHECK(text == "imu");
-    }
-
-    SUBCASE("from a string that fits") {
-        const ppb::InplaceString<8> name{std::string("imu")};
-
-        CHECK(name == "imu");
-    }
-
-    SUBCASE("from a longer string, keeping the first N bytes") {
-        const ppb::InplaceString<4> name{std::string("abcdef")};
-
-        CHECK(name == "abcd");
-    }
-
-    SUBCASE("never splitting a utf-8 character") {
-        // "abé", where é is the two bytes c3 a9
-        const std::string text = "ab\xc3\xa9";
-
-        CHECK(ppb::InplaceString<4>{text} == text);
-        CHECK(ppb::InplaceString<3>{text} == "ab");
-        CHECK(ppb::InplaceString<2>{text} == "ab");
-
-        // a four-byte character that doesn't fit at all
-        CHECK(ppb::InplaceString<3>{std::string("\xf0\x9f\x98\x80")}.empty());
-    }
 }

@@ -59,8 +59,9 @@ if(BUILD_TESTING)
     add_executable(picopb-tests
         tests/main.cpp
         tests/constraints.cpp
-        tests/containers.cpp
         tests/floats.cpp
+        tests/inplace_string.cpp
+        tests/inplace_vector.cpp
         tests/ints.cpp
         tests/libprotobuf.cpp
         tests/strings.cpp

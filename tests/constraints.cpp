@@ -2,7 +2,6 @@
 // each static_assert fails the build if an edit loosens or breaks a rule
 
 #include <array>
-#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <picopb/picopb.hpp>
@@ -59,10 +58,6 @@ struct NoAssignRange : std::vector<std::byte> {
     void assign_range(R&&) = delete;
 };
 
-// whether t.view() compiles, as a concept so a missing or private view() fails softly
-template <class T>
-concept HasView = requires(const T& t) { t.view(); };
-
 // every built-in number type and an int32 enum are field types, and these aren't
 static_assert(ppb::detail::FieldType<ppb::Int32>);
 static_assert(ppb::detail::FieldType<ppb::Int64>);
@@ -100,14 +95,6 @@ static_assert(ppb::detail::StringContainer<std::string>);
 static_assert(ppb::detail::StringContainer<ppb::InplaceString<8>>);
 static_assert(!ppb::detail::StringContainer<ppb::InplaceBytes<8>>);
 static_assert(!ppb::detail::StringContainer<std::string_view>);
-
-// text can't be passed or bound as a vector of chars
-static_assert(!std::convertible_to<ppb::InplaceString<8>&, ppb::InplaceVector<char, 8>&>);
-static_assert(!std::convertible_to<ppb::InplaceString<8>, ppb::InplaceVector<char, 8>>);
-
-// text becomes a std::string_view by conversion, as std::string does, with no view() member
-static_assert(std::convertible_to<const ppb::InplaceString<8>&, std::string_view>);
-static_assert(!HasView<ppb::InplaceString<8>>);
 
 // strings and bytes are field types too
 static_assert(ppb::detail::FieldType<ppb::String>);
