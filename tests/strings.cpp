@@ -6,6 +6,7 @@
 #include <array>
 #include <cstddef>
 #include <picopb/picopb.hpp>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -140,6 +141,60 @@ TEST_CASE_TEMPLATE("decode reports why a string field is malformed", M, InplaceS
     CHECK(error("0a 02 c3 28") == ppb::Error::InvalidUtf8);
     CHECK(error("0a 05 61") == ppb::Error::Truncated);
 }
+
+TEST_CASE_TEMPLATE("encode rejects a string field that isn't valid utf-8", M, InplaceStrings,
+                   StdStrings) {
+    const std::string eight = "aaaaaaaa";
+
+    // the invalid strings the decode test uses, in the same order
+    const std::array<std::string, 9> invalid{
+        "\xc3(",
+        "\x80",
+        "\xff",
+        "\xc3",
+        "\xc0\x80",
+        "\xed\xa0\x80",
+        "\xf4\x90\x80\x80",
+        eight + "\xc3(",
+        "\xc3\xa9" + eight + "\xff",
+    };
+
+    for (const std::string& text : invalid) {
+        INFO(test_util::hex(std::as_bytes(std::span(text))));
+
+        std::array<std::byte, 32> buffer{};
+        M message{};
+        message.s = decltype(message.s){std::string_view{text}};
+
+        const auto encoded = ppb::encode(message, buffer);
+
+        REQUIRE_FALSE(encoded.has_value());
+        CHECK(encoded.error() == ppb::Error::InvalidUtf8);
+    }
+}
+
+TEST_CASE_TEMPLATE("encode reports invalid utf-8 even when the buffer is also too small", M,
+                   InplaceStrings, StdStrings) {
+    std::array<std::byte, 1> buffer{};
+    M message{};
+    message.s = decltype(message.s){std::string_view{"\xc3("}};
+
+    const auto encoded = ppb::encode(message, buffer);
+
+    REQUIRE_FALSE(encoded.has_value());
+    CHECK(encoded.error() == ppb::Error::InvalidUtf8);
+}
+
+// encode checks utf-8 at compile time too
+static_assert([] {
+    std::array<std::byte, 16> buffer{};
+    InplaceStrings message{};
+    message.s = "\xc3(";
+
+    const auto encoded = ppb::encode(message, buffer);
+
+    return !encoded && encoded.error() == ppb::Error::InvalidUtf8;
+}());
 
 TEST_CASE("only the fixed-capacity storage rejects a value longer than its capacity") {
     const std::vector<std::byte> bytes = test_util::from_hex(seventeen_bytes());

@@ -21,14 +21,33 @@ namespace ppb {
 
 namespace detail {
 
-// writes every field of message, in the order specified by _fields
+// writes every field of message, in the order specified by _fields, stopping at the first error
 template <Message M>
-constexpr void write_fields(const M& message, Writer& w) {
-    std::apply(
+constexpr std::expected<void, Error> write_fields(const M& message, Writer& w) {
+    Error error{};
+
+    const auto write = [&](auto field) {
+        const auto written = decltype(field)::write(w, message);
+
+        if (!written) {
+            error = written.error();
+        }
+
+        return written.has_value();
+    };
+
+    // && stops at the first field whose write fails
+    const bool ok = std::apply(
         [&](auto... field) {
-            (decltype(field)::write(w, message), ...);
+            return (write(field) && ...);
         },
         M::_fields);
+
+    if (!ok) {
+        return std::unexpected(error);
+    }
+
+    return {};
 }
 
 // read one field into the member using the tag's field number
@@ -57,7 +76,11 @@ template <Message M>
                                                                  std::span<std::byte> buffer) {
     detail::Writer w{buffer};
 
-    detail::write_fields(message, w);
+    const auto written = detail::write_fields(message, w);
+
+    if (!written) {
+        return std::unexpected(written.error());
+    }
 
     if (w.overflowed()) {
         return std::unexpected(Error::BufferTooSmall);

@@ -38,8 +38,9 @@ stores<typename detail::member_type<decltype(Member)>::type> struct Field {
 
     // writes this field of message, unless it holds its default value
     template <class M>
-    static constexpr void write(detail::Writer& w, const M& message) {
-        detail::FieldTypeTraits<T>::write(w, N, message.*Member);
+    [[nodiscard]] static constexpr std::expected<void, Error> write(detail::Writer& w,
+                                                                    const M& message) {
+        return detail::FieldTypeTraits<T>::write(w, N, message.*Member);
     }
 
     // reads this field of message

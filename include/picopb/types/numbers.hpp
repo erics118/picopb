@@ -204,11 +204,12 @@ struct FieldTypeTraits<S> {
     static constexpr bool stores = std::same_as<V, typename S::cpp_type>;
 
     // a 0 isn't written, since the field has implicit presence
-    static constexpr void write(Writer& w, std::uint32_t number, const S::cpp_type& value) {
+    [[nodiscard]] static constexpr std::expected<void, Error> write(Writer& w, std::uint32_t number,
+                                                                    const S::cpp_type& value) {
         const std::uint64_t bits = S::to_bits(value);
 
         if (bits == 0) {
-            return;
+            return {};
         }
 
         w.write_tag(number, S::wire);
@@ -220,6 +221,8 @@ struct FieldTypeTraits<S> {
         } else {
             w.write_i64(bits);
         }
+
+        return {};
     }
 
     [[nodiscard]] static constexpr std::expected<bool, Error> read(Reader& r, WireType wire,

@@ -51,14 +51,25 @@ struct Bytes {};
 namespace detail {
 
 // an empty value isn't written, since the field has implicit presence
-template <class V>
-constexpr void write_len_field(Writer& w, std::uint32_t number, const V& value) {
-    if (std::ranges::empty(value)) {
-        return;
+template <bool ValidatesUtf8, class V>
+constexpr std::expected<void, Error> write_len_field(Writer& w, std::uint32_t number,
+                                                     const V& value) {
+    const std::span bytes(std::ranges::data(value), std::ranges::size(value));
+
+    if constexpr (ValidatesUtf8) {
+        if (!is_valid_utf8(bytes)) {
+            return std::unexpected(Error::InvalidUtf8);
+        }
+    }
+
+    if (bytes.empty()) {
+        return {};
     }
 
     w.write_tag(number, WireType::Len);
-    w.write_len(std::span(std::ranges::data(value), std::ranges::size(value)));
+    w.write_len(bytes);
+
+    return {};
 }
 
 template <bool ValidatesUtf8, class V>
@@ -99,12 +110,13 @@ struct FieldTypeTraits<String> {
     template <class V>
     static constexpr bool stores = StringContainer<V>;
 
+    // proto3 rejects a string that isn't valid utf-8, in both directions
     template <class V>
-    static constexpr void write(Writer& w, std::uint32_t number, const V& value) {
-        write_len_field(w, number, value);
+    [[nodiscard]] static constexpr std::expected<void, Error> write(Writer& w, std::uint32_t number,
+                                                                    const V& value) {
+        return write_len_field<true>(w, number, value);
     }
 
-    // proto3 rejects a string that isn't valid utf-8
     template <class V>
     [[nodiscard]] static constexpr std::expected<bool, Error> read(Reader& r, WireType wire,
                                                                    V& value) {
@@ -118,8 +130,9 @@ struct FieldTypeTraits<Bytes> {
     static constexpr bool stores = BytesContainer<V>;
 
     template <class V>
-    static constexpr void write(Writer& w, std::uint32_t number, const V& value) {
-        write_len_field(w, number, value);
+    [[nodiscard]] static constexpr std::expected<void, Error> write(Writer& w, std::uint32_t number,
+                                                                    const V& value) {
+        return write_len_field<false>(w, number, value);
     }
 
     template <class V>

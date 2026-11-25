@@ -8,9 +8,16 @@
 
 namespace ppb::detail {
 
+// a byte of text as a number; text is char when encoding and std::byte when decoding
+template <class Byte>
+constexpr std::uint32_t byte_value(Byte b) {
+    return static_cast<unsigned char>(b);
+}
+
 // if the 8 bytes at std::text[i] is ascii
 // because most text is just ascii, so this makes the check faster
-constexpr bool ascii8(std::span<const std::byte> text, std::size_t i) {
+template <class Byte>
+constexpr bool ascii8(std::span<const Byte> text, std::size_t i) {
     if (text.size() - i < 8) {
         return false;
     }
@@ -18,7 +25,7 @@ constexpr bool ascii8(std::span<const std::byte> text, std::size_t i) {
     std::uint32_t high_bits = 0;
 
     for (std::size_t k = 0; k < 8; ++k) {
-        high_bits |= std::to_integer<std::uint32_t>(text[i + k]);
+        high_bits |= byte_value(text[i + k]);
     }
 
     return (high_bits & 0x80) == 0;
@@ -43,7 +50,9 @@ constexpr std::size_t utf8_prefix(std::string_view text, std::size_t max) {
 
 // if is valid utf-8, which protobuf requires for string fields
 // rejects overlong forms, utf-16 surrogates, and code points above U+10FFFF
-constexpr bool is_valid_utf8(std::span<const std::byte> text) {
+template <class Byte>
+    requires(sizeof(Byte) == 1)
+constexpr bool is_valid_utf8(std::span<const Byte> text) {
     std::size_t i = 0;
 
     while (i < text.size()) {
@@ -52,7 +61,7 @@ constexpr bool is_valid_utf8(std::span<const std::byte> text) {
             continue;
         }
 
-        const auto lead = std::to_integer<std::uint32_t>(text[i]);
+        const auto lead = byte_value(text[i]);
 
         // ascii is one byte
         if (lead < 0x80) {
@@ -88,7 +97,7 @@ constexpr bool is_valid_utf8(std::span<const std::byte> text) {
         }
 
         for (std::size_t k = 1; k <= extra; ++k) {
-            const auto next = std::to_integer<std::uint32_t>(text[i + k]);
+            const auto next = byte_value(text[i + k]);
 
             // every byte after the lead must be 10xxxxxx
             if (!is_continuation(next)) {
