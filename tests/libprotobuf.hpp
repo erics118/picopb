@@ -17,6 +17,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 // we use libprotobuf as the reference for our tests
@@ -118,8 +119,12 @@ inline std::vector<std::byte> from_hex(std::string_view text) {
         unsigned value = 0;
 
         const std::string_view pair = text.substr(i, 2);
+        const char* const last = std::to_address(pair.end());
+        const auto [end, error] = std::from_chars(std::to_address(pair.begin()), last, value, 16);
 
-        std::from_chars(std::to_address(pair.begin()), std::to_address(pair.end()), value, 16);
+        REQUIRE(error == std::errc{});
+        REQUIRE(end == last);
+
         out.push_back(static_cast<std::byte>(value));
     }
 

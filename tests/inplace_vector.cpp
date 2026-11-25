@@ -369,8 +369,9 @@ TEST_CASE("InplaceVector::erase removes one element or a range, returning what f
 
     SUBCASE("the last element") {
         Bytes4 bytes = counting(2);
+        auto* const next = bytes.erase(std::next(bytes.cbegin()));
 
-        CHECK(bytes.erase(std::next(bytes.cbegin())) == bytes.end());
+        CHECK(next == bytes.end());
         CHECK(bytes == counting(1));
     }
 

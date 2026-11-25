@@ -169,7 +169,11 @@ TEST_CASE("ppb::decode accepts and rejects exactly the bytes libprotobuf does") 
 
 TEST_CASE("ppb::decode reports why the input is malformed") {
     auto error = [](std::string_view hex_bytes) {
-        return ppb::decode<Ints>(test_util::from_hex(hex_bytes)).error();
+        const auto decoded = ppb::decode<Ints>(test_util::from_hex(hex_bytes));
+
+        REQUIRE_FALSE(decoded.has_value());
+
+        return decoded.error();
     };
 
     CHECK(error("08 80") == ppb::Error::Truncated);
